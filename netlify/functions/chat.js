@@ -7,7 +7,7 @@
 // só esse arquivo, rodando no servidor, tem acesso a ela.
 
 const MODEL = 'claude-haiku-4-5-20251001';
-const MAX_TOKENS = 1024;
+const MAX_TOKENS = 1536;
 
 exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') {
@@ -33,7 +33,9 @@ exports.handler = async function (event) {
 
   const systemPrompt = `Você é o assistente de IA do Portal DMCON, um sistema de gestão da DMCON Contabilidade/RISE BPO.
 Responda perguntas do usuário com base EXCLUSIVAMENTE nos dados do Portal fornecidos abaixo. Seja direto, claro e responda em português do Brasil.
-Se a pergunta não puder ser respondida com os dados fornecidos, diga isso claramente em vez de inventar informação.
+Os dados incluem linhas de "por mês" (ex: "Jan: 0, Fev: 2, ... Ago: 5") pra cada módulo — use essas linhas pra responder perguntas sobre quantidade em um mês específico (ex: "quantos entraram em agosto"), lendo o número correspondente ao mês perguntado. Também há listas com os itens individuais (nome, data, responsável, regime tributário, quem é o responsável fiscal/contábil/pessoal-DP/comercial de cada cliente etc.) — use-as para perguntas sobre um cliente/processo/lead específico.
+Para processos societários em andamento, cada um vem com "Já feito" (o que já foi concluído no checklist) e "Falta fazer" (o que ainda falta) — quando perguntarem como está o processo de uma empresa, resuma essas duas listas de forma clara, e não apenas a etapa/status geral.
+Se mesmo assim a pergunta não puder ser respondida com os dados fornecidos, diga isso claramente em vez de inventar informação.
 Formate valores em reais como "R$ X.XXX". Responda em texto corrido ou listas simples, sem markdown complexo (sem tabelas).
 
 DADOS ATUAIS DO PORTAL:
