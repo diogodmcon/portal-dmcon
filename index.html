@@ -2200,7 +2200,7 @@ async function fazerLogin(){
     usuarioLogado = data;
     aplicarAcesso(data);
 
-    const paginaInicial = data.acesso.includes('dashboard') ? 'dashboard' : data.acesso[0];
+    const paginaInicial = data.acesso.includes('assistente') ? 'assistente' : (data.acesso.includes('dashboard') ? 'dashboard' : data.acesso[0]);
     navegar(paginaInicial, null);
     carregarDados();
     iniciarPollingMensagens();
@@ -6148,10 +6148,32 @@ let iaReconhecimentoVoz = null; // instância do SpeechRecognition do navegador
 let iaGravandoVoz = false;
 let iaEnviando = false;         // trava simples pra não deixar mandar duas perguntas ao mesmo tempo
 
-// Abre o chat: mostra a mensagem de boas-vindas só na primeira vez que a página é aberta.
+// Saudação de acordo com o horário atual (Bom dia / Boa tarde / Boa noite).
+function iaSaudacaoHorario(){
+  const h = new Date().getHours();
+  if(h>=5 && h<12) return 'Bom dia';
+  if(h>=12 && h<18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+// Abre o chat: enquanto não há nenhuma mensagem trocada, mostra uma tela de boas-vindas
+// centralizada com saudação + nome da pessoa. Assim que a primeira pergunta é enviada
+// (ver iaEnviarMensagem), essa tela dá lugar ao histórico normal da conversa.
 function iaAbrirChat(){
   if(iaChatHistorico.length===0){
-    iaAdicionarMensagem('assistant', 'Olá! Sou o assistente do Portal DMCON. Pode me perguntar sobre leads, clientes, processos societários, onboarding e outros dados do sistema — por texto ou usando o microfone. Como posso ajudar?');
+    const wrap = document.getElementById('ia-chat-mensagens');
+    if(wrap){
+      const primeiroNome = ((usuarioLogado && usuarioLogado.nome) || '').trim().split(' ')[0] || '';
+      wrap.innerHTML = `
+        <div id="ia-boas-vindas" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;">
+          <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--text-primary);letter-spacing:-0.5px;">
+            ${_iaEscapeHtml(iaSaudacaoHorario())}${primeiroNome ? ', ' + _iaEscapeHtml(primeiroNome) : ''}!
+          </div>
+          <div style="font-size:14px;color:var(--text-muted);max-width:440px;">
+            Pode me perguntar sobre leads, clientes, processos societários, onboarding e outros dados do Portal — por texto ou usando o microfone.
+          </div>
+        </div>`;
+    }
   }
   setTimeout(()=>document.getElementById('ia-chat-input')?.focus(), 100);
 }
@@ -6165,6 +6187,7 @@ function _iaEscapeHtml(s){
 function iaAdicionarMensagem(role, texto){
   const wrap = document.getElementById('ia-chat-mensagens');
   if(!wrap) return;
+  document.getElementById('ia-boas-vindas')?.remove(); // some a tela de saudação assim que a conversa começa
   const isUser = role==='user';
   const bolha = document.createElement('div');
   bolha.style.cssText = 'display:flex;' + (isUser ? 'justify-content:flex-end;' : '');
@@ -10332,7 +10355,10 @@ function entrarModulo(modulo){
   if(modulo==='portal'){
     document.getElementById('hub-screen').classList.remove('active');
     aplicarAcesso(usuarioLogado);
-    const paginaInicial = usuarioLogado.total ? 'dashboard' : (usuarioLogado.acesso||[])[0]||'dashboard';
+    const _acessoUser = usuarioLogado.acesso||[];
+    const paginaInicial = _acessoUser.includes('assistente')
+      ? 'assistente'
+      : (usuarioLogado.total ? 'dashboard' : (_acessoUser[0]||'dashboard'));
     navegar(paginaInicial, null);
   } else if(modulo==='financeiro'){
     bpoEntrar();
