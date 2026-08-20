@@ -1512,6 +1512,21 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
 <div class="page" id="page-assistente">
   <div class="topbar">
     <div class="topbar-left"><h1>🤖 Assistente IA</h1><p>Pergunte sobre qualquer informação do Portal — texto ou voz</p></div>
+    <div style="display:flex;gap:8px;position:relative;">
+      <button class="btn btn-ghost" onclick="iaAlternarHistorico()" title="Ver conversas anteriores">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Histórico
+      </button>
+      <button class="btn btn-primary" onclick="iaNovaConversa(true)" title="Começar uma conversa nova">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nova conversa
+      </button>
+      <div id="ia-historico-painel" style="display:none;position:absolute;top:46px;right:0;width:320px;max-height:420px;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.35);z-index:50;padding:8px;"></div>
+    </div>
+  </div>
+  <div id="ia-banner-arquivo" style="display:none;padding:9px 28px;background:var(--cyan-glow);border-bottom:1px solid var(--border-acc);font-size:12px;color:var(--text-soft);flex-shrink:0;align-items:center;justify-content:space-between;">
+    <span>📁 Você está vendo uma conversa arquivada.</span>
+    <a onclick="iaNovaConversa(true)" style="color:var(--cyan);cursor:pointer;font-weight:600;">Iniciar conversa nova →</a>
   </div>
   <div class="content" style="display:flex;flex-direction:column;padding:0;overflow:hidden;">
     <div id="ia-chat-mensagens" style="flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:14px;"></div>
@@ -6143,10 +6158,19 @@ function atualizarKpisOnb(){
 // ══════════════════════════════════════════════════════
 // MÓDULO ASSISTENTE IA — chat sobre os dados do Portal
 // ══════════════════════════════════════════════════════
-let iaChatHistorico = [];       // {role:'user'|'assistant', content:'...'} — só o que já foi trocado nesta sessão
+let iaChatHistorico = [];       // {role:'user'|'assistant', content:'...'} — a conversa atual (ainda não arquivada)
+let iaConversasArquivadas = []; // {id, dataIso, titulo, mensagens:[...]} — conversas anteriores, guardadas no navegador
+let iaVisualizandoArquivo = null; // id da conversa arquivada em exibição, ou null = conversa ao vivo
 let iaReconhecimentoVoz = null; // instância do SpeechRecognition do navegador
 let iaGravandoVoz = false;
 let iaEnviando = false;         // trava simples pra não deixar mandar duas perguntas ao mesmo tempo
+
+const IA_SUGESTOES = [
+  'Quantos leads temos em aberto?',
+  'Quais processos societários estão em andamento?',
+  'Como está o onboarding dos clientes novos?',
+  'Fechamos a meta do mês?',
+];
 
 // Saudação de acordo com o horário atual (Bom dia / Boa tarde / Boa noite).
 function iaSaudacaoHorario(){
@@ -6156,27 +6180,145 @@ function iaSaudacaoHorario(){
   return 'Boa noite';
 }
 
-// Abre o chat: enquanto não há nenhuma mensagem trocada, mostra uma tela de boas-vindas
-// centralizada com saudação + nome da pessoa. Assim que a primeira pergunta é enviada
-// (ver iaEnviarMensagem), essa tela dá lugar ao histórico normal da conversa.
+// Chave usada pra guardar o histórico de conversas no navegador, uma por usuário.
+function iaChaveStorage(){
+  const u = ((usuarioLogado && usuarioLogado.usuario) || 'anon').toString().toUpperCase();
+  return 'dmcon_ia_conversas_' + u;
+}
+
+function iaCarregarArquivoLS(){
+  try{
+    const raw = localStorage.getItem(iaChaveStorage());
+    iaConversasArquivadas = raw ? JSON.parse(raw) : [];
+  } catch(e){ iaConversasArquivadas = []; }
+}
+
+function iaSalvarArquivoLS(){
+  try{
+    localStorage.setItem(iaChaveStorage(), JSON.stringify(iaConversasArquivadas.slice(0, 30)));
+  } catch(e){ console.warn('Não foi possível salvar o histórico do Assistente IA:', e.message); }
+}
+
+function iaFormatarDataHora(iso){
+  try{
+    const d = new Date(iso);
+    const hoje = new Date();
+    const mesmoDia = d.toDateString()===hoje.toDateString();
+    const hora = d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    return mesmoDia ? ('Hoje, ' + hora) : (d.toLocaleDateString('pt-BR') + ' às ' + hora);
+  } catch(e){ return ''; }
+}
+
+// Arquiva a conversa atual (se tiver mensagens) na lista de conversas anteriores.
+function iaArquivarConversaAtual(){
+  if(iaChatHistorico.length===0) return;
+  const primeiraPergunta = (iaChatHistorico.find(m=>m.role==='user')||{}).content || 'Conversa';
+  iaConversasArquivadas.unshift({
+    id: 'c' + Date.now(),
+    dataIso: new Date().toISOString(),
+    titulo: primeiraPergunta.length>48 ? primeiraPergunta.slice(0,48)+'…' : primeiraPergunta,
+    mensagens: iaChatHistorico.slice(),
+  });
+  iaSalvarArquivoLS();
+}
+
+// Abre o chat: sempre que a página é acessada, arquiva a conversa anterior (se houver)
+// e mostra a tela de boas-vindas centralizada com saudação + nome da pessoa, junto
+// com sugestões rápidas de pergunta. Assim que a 1a pergunta é enviada, essa tela dá
+// lugar ao histórico normal da conversa (ver iaAdicionarMensagem/iaEnviarMensagem).
 function iaAbrirChat(){
-  if(iaChatHistorico.length===0){
-    const wrap = document.getElementById('ia-chat-mensagens');
-    if(wrap){
-      const primeiroNome = ((usuarioLogado && usuarioLogado.nome) || '').trim().split(' ')[0] || '';
-      wrap.innerHTML = `
-        <div id="ia-boas-vindas" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;">
-          <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--text-primary);letter-spacing:-0.5px;">
-            ${_iaEscapeHtml(iaSaudacaoHorario())}${primeiroNome ? ', ' + _iaEscapeHtml(primeiroNome) : ''}!
-          </div>
-          <div style="font-size:14px;color:var(--text-muted);max-width:440px;">
-            Pode me perguntar sobre leads, clientes, processos societários, onboarding e outros dados do Portal — por texto ou usando o microfone.
-          </div>
-        </div>`;
-    }
-  }
+  iaCarregarArquivoLS();
+  iaArquivarConversaAtual();
+  iaChatHistorico = [];
+  iaVisualizandoArquivo = null;
+  document.getElementById('ia-banner-arquivo').style.display = 'none';
+  document.getElementById('ia-historico-painel').style.display = 'none';
+  iaRenderBoasVindas();
   setTimeout(()=>document.getElementById('ia-chat-input')?.focus(), 100);
 }
+
+function iaRenderBoasVindas(){
+  const wrap = document.getElementById('ia-chat-mensagens');
+  if(!wrap) return;
+  const primeiroNome = ((usuarioLogado && usuarioLogado.nome) || '').trim().split(' ')[0] || '';
+  wrap.innerHTML = `
+    <div id="ia-boas-vindas" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;">
+      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--royal),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 8px 24px var(--cyan-glow);">🤖</div>
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--text-primary);letter-spacing:-0.5px;">
+          ${_iaEscapeHtml(iaSaudacaoHorario())}${primeiroNome ? ', ' + _iaEscapeHtml(primeiroNome) : ''}!
+        </div>
+        <div style="font-size:14px;color:var(--text-muted);max-width:440px;margin-top:8px;">
+          Pode me perguntar sobre leads, clientes, processos societários, onboarding e outros dados do Portal — por texto ou usando o microfone.
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:520px;">
+        ${IA_SUGESTOES.map(s=>`<button onclick="iaUsarSugestao('${s.replace(/'/g,"\\'")}')" style="padding:9px 14px;border-radius:999px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12.5px;cursor:pointer;transition:all .15s;font-family:inherit;" onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--text-primary)';" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-soft)';">${_iaEscapeHtml(s)}</button>`).join('')}
+      </div>
+    </div>`;
+}
+
+function iaUsarSugestao(texto){
+  const input = document.getElementById('ia-chat-input');
+  if(!input) return;
+  input.value = texto;
+  iaEnviarMensagem();
+}
+
+// Começa uma conversa nova: arquiva a atual (se houver) e volta pra tela de boas-vindas.
+// forcar=true é usado pelo botão "Nova conversa" (arquiva mesmo vindo de uma visualização de arquivo).
+function iaNovaConversa(forcar){
+  if(iaVisualizandoArquivo===null){ iaArquivarConversaAtual(); }
+  iaChatHistorico = [];
+  iaVisualizandoArquivo = null;
+  document.getElementById('ia-banner-arquivo').style.display = 'none';
+  document.getElementById('ia-historico-painel').style.display = 'none';
+  iaRenderBoasVindas();
+  document.getElementById('ia-chat-input')?.focus();
+}
+
+function iaAlternarHistorico(){
+  const painel = document.getElementById('ia-historico-painel');
+  if(!painel) return;
+  const abrindo = painel.style.display==='none';
+  if(abrindo){ iaCarregarArquivoLS(); iaRenderHistoricoPainel(); }
+  painel.style.display = abrindo ? 'block' : 'none';
+}
+
+function iaRenderHistoricoPainel(){
+  const painel = document.getElementById('ia-historico-painel');
+  if(!painel) return;
+  if(iaConversasArquivadas.length===0){
+    painel.innerHTML = `<div style="padding:16px;text-align:center;font-size:12.5px;color:var(--text-muted);">Nenhuma conversa arquivada ainda.<br>Suas conversas anteriores vão aparecer aqui.</div>`;
+    return;
+  }
+  painel.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 8px 4px;">Conversas anteriores</div>` +
+    iaConversasArquivadas.map(c=>`
+      <div onclick="iaVerConversaArquivada('${c.id}')" style="padding:10px 10px;border-radius:8px;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='var(--bg-card-hover)';" onmouseout="this.style.background='transparent';">
+        <div style="font-size:12.5px;color:var(--text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_iaEscapeHtml(c.titulo)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${_iaEscapeHtml(iaFormatarDataHora(c.dataIso))} · ${c.mensagens.length} mensagens</div>
+      </div>`).join('');
+}
+
+function iaVerConversaArquivada(id){
+  const conversa = iaConversasArquivadas.find(c=>c.id===id);
+  if(!conversa) return;
+  iaVisualizandoArquivo = id;
+  document.getElementById('ia-historico-painel').style.display = 'none';
+  document.getElementById('ia-banner-arquivo').style.display = 'flex';
+  const wrap = document.getElementById('ia-chat-mensagens');
+  wrap.innerHTML = '';
+  conversa.mensagens.forEach(m=>iaAdicionarMensagem(m.role, m.content));
+}
+
+// Fecha o painel de histórico ao clicar fora dele.
+document.addEventListener('click', function(e){
+  const painel = document.getElementById('ia-historico-painel');
+  if(!painel || painel.style.display==='none') return;
+  if(painel.contains(e.target)) return;
+  if(e.target.closest('button[onclick="iaAlternarHistorico()"]')) return;
+  painel.style.display = 'none';
+});
 
 function _iaEscapeHtml(s){
   const d = document.createElement('div');
@@ -6190,8 +6332,11 @@ function iaAdicionarMensagem(role, texto){
   document.getElementById('ia-boas-vindas')?.remove(); // some a tela de saudação assim que a conversa começa
   const isUser = role==='user';
   const bolha = document.createElement('div');
-  bolha.style.cssText = 'display:flex;' + (isUser ? 'justify-content:flex-end;' : '');
-  bolha.innerHTML = `<div style="max-width:72%;padding:11px 15px;border-radius:14px;font-size:13.5px;line-height:1.55;white-space:pre-wrap;${isUser
+  bolha.style.cssText = 'display:flex;gap:8px;align-items:flex-end;' + (isUser ? 'flex-direction:row-reverse;' : '');
+  const avatar = isUser
+    ? `<div style="width:26px;height:26px;border-radius:50%;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex-shrink:0;">${_iaEscapeHtml((((usuarioLogado&&usuarioLogado.nome)||'').trim().split(' ').map(p=>p[0]).slice(0,2).join('')||'EU').toUpperCase())}</div>`
+    : `<div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--royal),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">🤖</div>`;
+  bolha.innerHTML = avatar + `<div style="max-width:70%;padding:11px 15px;border-radius:14px;font-size:13.5px;line-height:1.55;white-space:pre-wrap;${isUser
     ? 'background:var(--cyan);color:#fff;border-bottom-right-radius:4px;'
     : 'background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);border-bottom-left-radius:4px;'}">${_iaEscapeHtml(texto)}</div>`;
   wrap.appendChild(bolha);
@@ -6203,8 +6348,8 @@ function iaMostrarDigitando(){
   if(!wrap || document.getElementById('ia-digitando')) return;
   const el = document.createElement('div');
   el.id = 'ia-digitando';
-  el.style.cssText = 'display:flex;';
-  el.innerHTML = `<div style="padding:11px 15px;border-radius:14px;border-bottom-left-radius:4px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);font-size:13px;">Digitando...</div>`;
+  el.style.cssText = 'display:flex;gap:8px;align-items:flex-end;';
+  el.innerHTML = `<div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--royal),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">🤖</div><div style="padding:11px 15px;border-radius:14px;border-bottom-left-radius:4px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);font-size:13px;">Digitando...</div>`;
   wrap.appendChild(el);
   wrap.scrollTop = wrap.scrollHeight;
 }
@@ -6215,9 +6360,37 @@ function iaRemoverDigitando(){
 // Resume os dados dos módulos do Portal num texto compacto, pra mandar como contexto
 // pra IA responder perguntas sobre o que está cadastrado. Cada bloco é isolado em
 // try/catch pra um módulo com problema não derrubar o resumo dos outros.
+const IA_NOMES_MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+// Extrai {mes:1-12, ano} de uma data em qualquer um dos formatos usados no Portal:
+// "MM/YYYY", "DD/MM/YYYY", "DD/MM" (sem ano, assume ano atual) ou ISO "YYYY-MM-DD".
+function iaExtrairMesAno(str){
+  if(!str) return null;
+  str = String(str).trim();
+  let m;
+  if((m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))){ return {mes:parseInt(m[2],10), ano:parseInt(m[1],10)}; }
+  if((m = str.match(/^(\d{1,2})\/(\d{4})$/))){ return {mes:parseInt(m[1],10), ano:parseInt(m[2],10)}; }
+  if((m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))){ return {mes:parseInt(m[2],10), ano:parseInt(m[3],10)}; }
+  if((m = str.match(/^(\d{1,2})\/(\d{1,2})$/))){ return {mes:parseInt(m[2],10), ano:new Date().getFullYear()}; }
+  return null;
+}
+
+// Monta uma linha "Jan: 0, Fev: 0, ... Ago: 5, ..." contando quantos itens da lista
+// caem em cada mês do ano atual (usando extrator(item) pra pegar a data de cada um).
+function iaContarPorMes(lista, extrator){
+  const anoAtual = new Date().getFullYear();
+  const contagem = new Array(12).fill(0);
+  lista.forEach(item=>{
+    const ma = iaExtrairMesAno(extrator(item));
+    if(ma && ma.ano===anoAtual && ma.mes>=1 && ma.mes<=12) contagem[ma.mes-1]++;
+  });
+  return IA_NOMES_MESES.map((nome,i)=>nome+': '+contagem[i]).join(', ');
+}
+
 function montarContextoPortal(){
   const blocos = [];
   const fmtR$ = v => 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0});
+  const anoAtual = new Date().getFullYear();
 
   // Comercial
   try{
@@ -6232,13 +6405,19 @@ function montarContextoPortal(){
       const metaMes = (typeof metasMensais!=='undefined' ? metasMensais[parseInt(mmAtual,10)-1] : 0) || 0;
       let txt = `COMERCIAL: ${leads.length} leads cadastrados no total. Por etapa: ${ETAPAS_KANBAN.map(e=>e.label.replace(/[^\w\sÀ-ú/]/g,'').trim()+': '+porEtapa[e.key]).join(', ')}. `
         + `Fechados no mês atual (${mesAtual}): ${fechadosMes.length}, somando ${fmtR$(valorFechadoMes)}. `
-        + `Meta do mês: ${metaMes ? fmtR$(metaMes) : 'não definida'}.`;
-      const abertos = leads.filter(l=>l.etapa!=='fechado' && l.etapa!=='perdido').slice(0,25);
+        + `Meta do mês: ${metaMes ? fmtR$(metaMes) : 'não definida'}.`
+        + `\nLeads criados por mês (${anoAtual}): ${iaContarPorMes(leads, l=>l.mes_abertura)}.`
+        + `\nLeads fechados por mês (${anoAtual}): ${iaContarPorMes(leads.filter(l=>l.etapa==='fechado'), l=>l.mes_conclusao||l.mes_abertura)}.`;
+      const abertos = leads.filter(l=>l.etapa!=='fechado' && l.etapa!=='perdido').slice(0,40);
       if(abertos.length){
         txt += '\nLeads em aberto: ' + abertos.map(l=>{
           const et = ETAPAS_KANBAN.find(e=>e.key===l.etapa);
-          return `${l.nome} (etapa: ${et?et.label.replace(/[^\w\sÀ-ú/]/g,'').trim():l.etapa}, vendedor: ${l.responsavel||'sem responsável'}, valor: ${fmtR$(l.valor_estimado)})`;
+          return `${l.nome} (etapa: ${et?et.label.replace(/[^\w\sÀ-ú/]/g,'').trim():l.etapa}, vendedor: ${l.responsavel||'sem responsável'}, valor: ${fmtR$(l.valor_estimado)}, entrada: ${l.mes_abertura||'—'})`;
         }).join('; ') + '.';
+      }
+      const fechados = leads.filter(l=>l.etapa==='fechado').slice(0,40);
+      if(fechados.length){
+        txt += '\nLeads fechados (todos): ' + fechados.map(l=>`${l.nome} (${l.mes_conclusao||l.mes_abertura}, ${fmtR$(l.valor_estimado)})`).join('; ') + '.';
       }
       blocos.push(txt);
     }
@@ -6248,10 +6427,28 @@ function montarContextoPortal(){
   try{
     if(typeof processosSoc !== 'undefined'){
       const total = processosSoc.length;
-      const andamento = processosSoc.filter(p=>p.status!=='finalizado');
-      let txt = `SOCIETÁRIO: ${total} processos cadastrados no total, ${andamento.length} em andamento.`;
+      const andamento = processosSoc.filter(p=>p.status!=='finalizado' && p.status!=='concluido');
+      const TIPO_LABEL_IA = {constituicao:'Constituição',alteracao:'Alteração',transferencia:'Transferência',mei:'Migração MEI',baixa:'Baixa de Empresa',outros:'Outros Serviços'};
+      let txt = `SOCIETÁRIO: ${total} processos cadastrados no total, ${andamento.length} em andamento.`
+        + `\nProcessos abertos por mês (${anoAtual}): ${iaContarPorMes(processosSoc, p=>p.mesAbertura)}.`;
       if(andamento.length){
-        txt += '\nProcessos em andamento: ' + andamento.slice(0,25).map(p=>`${p.nome} (tipo: ${p.tipo}, responsável: ${p.resp||'—'}${p.prazo?', '+p.prazo:''})`).join('; ') + '.';
+        // Pra cada processo em andamento, monta o status do checklist (o que já foi feito e o
+        // que ainda falta), usando a mesma lista de etapas (CL_SOC) que aparece no checklist do Portal.
+        txt += '\nProcessos em andamento (com checklist): ' + andamento.slice(0,30).map(p=>{
+          const items = (typeof CL_SOC!=='undefined' ? CL_SOC[p.tipo] : null) || [];
+          const feitosIdx = Array.isArray(p.feitos) ? p.feitos : [];
+          let checklistTxt = '';
+          if(items.length){
+            const feitos = items.filter((it,i)=>feitosIdx.includes(i)).map(it=>it.t);
+            const pendentes = items.filter((it,i)=>!feitosIdx.includes(i)).map(it=>it.t);
+            checklistTxt = ` | Já feito (${feitos.length}/${items.length}): ${feitos.length ? feitos.join('; ') : 'nada ainda'}. | Falta fazer: ${pendentes.length ? pendentes.join('; ') : 'nada, só falta finalizar'}.`;
+          }
+          return `${p.nome} (tipo: ${TIPO_LABEL_IA[p.tipo]||p.tipo}, responsável: ${Array.isArray(p.resp)?p.resp.join(', '):(p.resp||'—')}${p.prazo?', prazo '+p.prazo:''}, abertura: ${p.mesAbertura||'—'})${checklistTxt}`;
+        }).join('\n') + '.';
+      }
+      const concluidos = processosSoc.filter(p=>p.status==='finalizado' || p.status==='concluido').slice(0,40);
+      if(concluidos.length){
+        txt += '\nProcessos concluídos: ' + concluidos.map(p=>`${p.nome} (tipo: ${TIPO_LABEL_IA[p.tipo]||p.tipo}, abertura: ${p.mesAbertura||'—'})`).join('; ') + '.';
       }
       blocos.push(txt);
     }
@@ -6263,16 +6460,35 @@ function montarContextoPortal(){
       const porEtapaOnb = {};
       ETAPAS_KANBAN_ONB.forEach(e=>porEtapaOnb[e.key]=0);
       clientesOnb.forEach(c=>{ if(porEtapaOnb[c.etapaAtual]!==undefined) porEtapaOnb[c.etapaAtual]++; });
-      blocos.push(`ONBOARDING: ${clientesOnb.length} clientes cadastrados no total. `
-        + ETAPAS_KANBAN_ONB.map(e=>e.label.replace(/[^\w\sÀ-ú]/g,'').trim()+': '+porEtapaOnb[e.key]).join(', ') + '.');
+      let txt = `ONBOARDING: ${clientesOnb.length} clientes cadastrados no total. `
+        + ETAPAS_KANBAN_ONB.map(e=>e.label.replace(/[^\w\sÀ-ú]/g,'').trim()+': '+porEtapaOnb[e.key]).join(', ') + '.'
+        + `\nEntradas em onboarding por mês (${anoAtual}): ${iaContarPorMes(clientesOnb, c=>c.dataEntrada)}.`;
+      if(clientesOnb.length){
+        txt += '\nClientes em onboarding: ' + clientesOnb.slice(0,40).map(c=>{
+          const et = ETAPAS_KANBAN_ONB.find(e=>e.key===c.etapaAtual);
+          return `${c.nome} (etapa: ${et?et.label.replace(/[^\w\sÀ-ú]/g,'').trim():c.etapaAtual}, entrada: ${c.dataEntrada||'—'}, mês de acompanhamento: ${c.mesAcomp!=null?c.mesAcomp:'—'})`;
+        }).join('; ') + '.';
+      }
+      blocos.push(txt);
     }
   } catch(e){ console.warn('Contexto IA (onboarding):', e.message); }
 
-  // Clientes ativos (Operação)
+  // Clientes (Operação)
   try{
     if(typeof opClientes !== 'undefined'){
-      const ativos = opClientes.filter(c=>c.ativo);
-      blocos.push(`CLIENTES: ${ativos.length} clientes ativos de ${opClientes.length} cadastrados no total.`);
+      const ativos = opClientes.filter(c=>c.ativo!==false);
+      let txt = `CLIENTES (OPERAÇÃO): ${ativos.length} clientes ativos de ${opClientes.length} cadastrados no total.`
+        + `\nClientes com início de contrato por mês (${anoAtual}): ${iaContarPorMes(ativos, c=>c.inicio)}.`
+        + '\nDistribuição por regime: ' + ['Simples Nacional','Lucro Presumido','Lucro Real','MEI'].map(r=>r+': '+ativos.filter(c=>c.regime===r).length).join(', ') + '.';
+      if(ativos.length){
+        txt += '\nClientes ativos: ' + ativos.slice(0,50).map(c=>{
+          const servicos = Array.isArray(c.servicos) && c.servicos.length ? c.servicos.join(', ') : '—';
+          return `${c.nome} (cnpj: ${c.cnpj||'—'}, regime: ${c.regime||'—'}${c.cidade?', '+c.cidade:''}${c.uf?'/'+c.uf:''}, início: ${c.inicio||'—'}, `
+            + `resp. fiscal: ${c.respFiscal||'—'}, resp. contábil: ${c.respContabil||'—'}, resp. pessoal/DP: ${c.respPessoal||c.respDp||'—'}, resp. comercial: ${c.comercial||'—'}, `
+            + `serviços contratados: ${servicos}${c.grupo?', grupo: '+c.grupo:''}${c.indicacao?', indicação: '+c.indicacao:''})`;
+        }).join('; ') + '.';
+      }
+      blocos.push(txt);
     }
   } catch(e){ console.warn('Contexto IA (clientes):', e.message); }
 
@@ -6285,6 +6501,14 @@ async function iaEnviarMensagem(){
   if(!input) return;
   const texto = input.value.trim();
   if(!texto) return;
+
+  // Se a pessoa estava vendo uma conversa arquivada e começa a digitar, isso inicia
+  // uma conversa nova (a arquivada continua salva, intacta, no histórico).
+  if(iaVisualizandoArquivo!==null){
+    iaVisualizandoArquivo = null;
+    document.getElementById('ia-banner-arquivo').style.display = 'none';
+    document.getElementById('ia-chat-mensagens').innerHTML = '';
+  }
 
   input.value = '';
   input.style.height = 'auto';
