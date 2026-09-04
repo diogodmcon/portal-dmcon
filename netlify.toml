@@ -1,3 +1,9 @@
 [build]
   publish = "."
   functions = "netlify/functions"
+
+# Função agendada: manda o resumo diário do Fiscal por e-mail (gestores + responsáveis) todo dia
+# às 8h da manhã de Brasília (8h BRT = 11h UTC — Brasil não tem mais horário de verão desde 2019).
+# Ver netlify/functions/daily-email.js pra entender o que ela faz e o que precisa configurar.
+[functions."daily-email"]
+  schedule = "0 11 * * *"
