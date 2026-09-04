@@ -2456,7 +2456,7 @@ async function fazerLogin(){
         ...perfilLocal, ...data,
         acesso: (Array.isArray(data.acesso) && data.acesso.length) ? data.acesso : (perfilLocal.acesso || []),
         total: donoSempreTotal ? true : ((data.total===true || data.total===false) ? data.total : !!perfilLocal.total),
-        fiscalResp: data.fiscalResp || data.fiscal_resp || perfilLocal.fiscalResp || null,
+        fiscalResp: data.fiscalResp || data.fiscal_resp || data.fiscalresp || perfilLocal.fiscalResp || null,
         fiscalConferente: (data.fiscalconferente===true || data.fiscalconferente===false) ? data.fiscalconferente : !!perfilLocal.fiscalConferente,
       };
       entrarComoLocal(userFinal, false);
@@ -2835,6 +2835,17 @@ let admUsuariosCache = [];
 // total, fiscalResp/fiscal_resp, fiscalconferente) só sabemos depois de olhar os dados de verdade.
 let admColunasDisponiveis = new Set(['usuario','senha','ativo']);
 
+// O nome da coluna "Responsável Fiscal" no Supabase pode ter sido criado como fiscalResp,
+// fiscal_resp ou fiscalresp (bancos costumam guardar tudo em minúsculo mesmo quando a gente
+// digita camelCase) — sem isso, salvar sempre com a grafia "fiscalResp" fixa podia cair num
+// nome de coluna que não existe de verdade lá, e o campo era descartado (nunca salvo) sem
+// ninguém perceber. Essa função acha, na lista de colunas que a tabela realmente tem, qual
+// dessas grafias é a que existe — senão devolve null.
+function admColunaFiscalResp(){
+  const opcoes=['fiscalResp','fiscal_resp','fiscalresp'];
+  return opcoes.find(op=>admColunasDisponiveis.has(op)) || null;
+}
+
 async function admCarregarUsuarios(){
   const lista = document.getElementById('adm-usuarios-lista');
   if(lista) lista.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Carregando usuários...</div>';
@@ -2857,6 +2868,7 @@ function admRenderAvisoColunas(){
   const aviso = document.getElementById('adm-usuarios-aviso');
   if(!aviso) return;
   const faltando = ['acesso','total','email','fiscalconferente'].filter(c=>!admColunasDisponiveis.has(c));
+  if(!admColunaFiscalResp()) faltando.push('fiscalResp (Responsável Fiscal)');
   if(faltando.length){
     aviso.style.display='block';
     const listaFaltando = faltando.length>1 ? faltando.slice(0,-1).join(', ')+' e '+faltando[faltando.length-1] : faltando[0];
@@ -2892,7 +2904,7 @@ function admRenderUsuarios(){
       <div style="width:38px;height:38px;border-radius:50%;background:var(--cyan-glow);color:var(--cyan);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(u.iniciais||(u.nome||u.usuario||'??').substring(0,2)).toUpperCase()}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13.5px;font-weight:700;color:var(--text-primary);">${u.nome||u.usuario}${!ativo?' <span style="font-size:10.5px;color:var(--red);font-weight:600;">(inativo)</span>':''}</div>
-        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:5px;">Login: ${u.usuario} · ${u.perfil||'—'}${u.email?' · '+u.email:' · <span style="color:var(--yellow);">sem e-mail cadastrado</span>'}${u.fiscalResp||u.fiscal_resp?' · Fiscal: só empresas de '+(u.fiscalResp||u.fiscal_resp):''}</div>
+        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:5px;">Login: ${u.usuario} · ${u.perfil||'—'}${u.email?' · '+u.email:' · <span style="color:var(--yellow);">sem e-mail cadastrado</span>'}${(u.fiscalResp||u.fiscal_resp||u.fiscalresp)?' · Fiscal: só empresas de '+(u.fiscalResp||u.fiscal_resp||u.fiscalresp):''}</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;">${admBadgeAcesso(u)}</div>
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0;">
@@ -2976,7 +2988,7 @@ function admAbrirModalUsuario(usuarioLogin){
   document.getElementById('mu-senha').value = '';
   document.getElementById('mu-senha-hint').textContent = editando ? '(deixe em branco pra manter a senha atual)' : '';
   document.getElementById('mu-perfil').value = u?.perfil || '';
-  document.getElementById('mu-fiscalresp').value = u?.fiscalResp || u?.fiscal_resp || '';
+  document.getElementById('mu-fiscalresp').value = u?.fiscalResp || u?.fiscal_resp || u?.fiscalresp || '';
   document.getElementById('mu-ativo').checked = u ? (u.ativo!==false) : true;
   document.getElementById('mu-erro').style.display = 'none';
 
@@ -3016,7 +3028,7 @@ async function admSalvarUsuario(){
   if(!editando && admUsuariosCache.some(x=>(x.usuario||'').toUpperCase()===usuario)){ erro.textContent='Já existe um usuário com esse login'; erro.style.display='block'; return; }
   if(!acesso.length && !total){ erro.textContent='Marque pelo menos 1 módulo (ou ative "Acesso de Gestor")'; erro.style.display='block'; return; }
 
-  const payloadCompleto = { usuario, nome, email: email||null, iniciais, perfil, ativo, acesso, total, fiscalResp: fiscalResp||null, fiscalconferente: fiscalConferente };
+  const payloadCompleto = { usuario, nome, email: email||null, iniciais, perfil, ativo, acesso, total, fiscalconferente: fiscalConferente };
   if(senha) payloadCompleto.senha = senha;
 
   // Só manda pro Supabase os campos que a tabela realmente tem (descobertos em admCarregarUsuarios) —
@@ -3030,6 +3042,14 @@ async function admSalvarUsuario(){
       camposIgnorados.push(k);
     }
   });
+  // "Responsável Fiscal" é tratado à parte: a coluna pode existir no Supabase como fiscalResp,
+  // fiscal_resp ou fiscalresp — grava na grafia que realmente existe lá, senão o valor digitado
+  // é descartado silenciosamente (era exatamente isso que fazia gente cadastrada depois — como
+  // a Suelen, o Mateus e a Ketelyn — nunca ter o campo salvo de verdade e continuar vendo todas
+  // as empresas do Fiscal em vez de só as próprias).
+  const colFiscalResp = admColunaFiscalResp();
+  if(colFiscalResp) payload[colFiscalResp] = fiscalResp||null;
+  else camposIgnorados.push('fiscalResp (Responsável Fiscal)');
 
   const btn = document.getElementById('mu-btn-salvar');
   btn.disabled = true; btn.textContent = 'Salvando...';
