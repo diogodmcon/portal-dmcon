@@ -7257,13 +7257,34 @@ function montarContextoPortal(){
   const fmtR$ = v => 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0});
   const anoAtual = new Date().getFullYear();
 
+  // Quem está logado e o que essa pessoa tem permissão de acessar — usado tanto pra IA saber
+  // responder "minhas empresas"/"minha responsabilidade" sem precisar perguntar de novo, quanto
+  // pra decidir, logo abaixo, quais blocos de dados entram no contexto (só os módulos liberados
+  // pra essa pessoa) — assim os dados de módulos sem permissão nem chegam a sair do navegador.
+  const _acesso = (typeof usuarioLogado!=='undefined' && usuarioLogado && Array.isArray(usuarioLogado.acesso)) ? usuarioLogado.acesso : [];
+  const _temTotal = typeof usuarioLogado!=='undefined' && usuarioLogado && !!usuarioLogado.total;
+  const _pode = modulo => _temTotal || _acesso.includes(modulo);
+  try{
+    if(typeof usuarioLogado!=='undefined' && usuarioLogado){
+      const nomeCurto = (usuarioLogado.nome||usuarioLogado.usuario||'').trim();
+      const modulosPermitidos = _temTotal ? 'TODOS os módulos (Acesso de Gestor)' : (_acesso.length ? _acesso.join(', ') : 'nenhum módulo liberado ainda');
+      let txtId = `QUEM ESTÁ PERGUNTANDO: ${nomeCurto} (login: ${usuarioLogado.usuario||'—'}, cargo: ${usuarioLogado.perfil||'—'}).`
+        + `\nMódulos que essa pessoa tem permissão de acessar no Portal: ${modulosPermitidos}.`;
+      if(usuarioLogado.fiscalResp){
+        txtId += `\nNo Fiscal, o "responsável" dessa pessoa é exatamente "${usuarioLogado.fiscalResp}" — quando ela perguntar algo tipo "minhas empresas", "meus clientes", "minha responsabilidade", "quantas empresas eu tenho", use esse nome pra filtrar os dados dos blocos FISCAL abaixo (campo responsável) e responda diretamente, SEM pedir pra ela informar o nome de novo.`;
+      }
+      txtId += `\nIMPORTANTE: os blocos de dados abaixo já vêm filtrados de acordo com o que essa pessoa tem permissão de ver — um módulo sem permissão simplesmente NÃO aparece nos dados. Se ela perguntar sobre um módulo que não aparece nos blocos abaixo, responda educadamente que ela não tem acesso a essa área do Portal e que, se precisar, peça liberação a um gestor — nunca invente ou estime números de um módulo que não foi incluído aqui.`;
+      blocos.push(txtId);
+    }
+  } catch(e){ console.warn('Contexto IA (identidade):', e.message); }
+
   // Fiscal — Apurações (Obrigações do Mês) e Obrigações Acessórias. Usa a mesma base de empresas
   // (fopBuildClientes, sem pendências de configuração) e a mesma lógica de vencimento/atraso
   // (fopVencimentoEfetivo) que a tela do Fiscal e a aba Gerencial usam, pra IA nunca informar um
   // número diferente do que a pessoa vê no Portal. Reflete o mês atualmente selecionado na tela
   // do Fiscal (ou o mês corrente, se ainda não visitou a tela nesta sessão).
   try{
-    if(typeof fopBuildClientes==='function' && typeof fopGetApur==='function' && typeof FOP_LABELS!=='undefined'){
+    if(_pode('fiscal') && typeof fopBuildClientes==='function' && typeof fopGetApur==='function' && typeof FOP_LABELS!=='undefined'){
       const _fiscalBase = fopBuildClientes().filter(c=>!c.pendente);
       const mesLabel = (typeof IA_NOMES_MESES!=='undefined'?IA_NOMES_MESES[fopGetMes()]:'') + '/' + anoAtual;
 
@@ -7357,7 +7378,7 @@ function montarContextoPortal(){
 
   // Comercial
   try{
-    if(typeof leads !== 'undefined'){
+    if(_pode('comercial') && typeof leads !== 'undefined'){
       const porEtapa = {};
       ETAPAS_KANBAN.forEach(e=>porEtapa[e.key]=0);
       leads.forEach(l=>{ if(porEtapa[l.etapa]!==undefined) porEtapa[l.etapa]++; });
@@ -7389,7 +7410,7 @@ function montarContextoPortal(){
 
   // Societário
   try{
-    if(typeof processosSoc !== 'undefined'){
+    if(_pode('societario') && typeof processosSoc !== 'undefined'){
       const total = processosSoc.length;
       const andamento = processosSoc.filter(p=>p.status!=='finalizado' && p.status!=='concluido');
       const TIPO_LABEL_IA = {constituicao:'Constituição',alteracao:'Alteração',transferencia:'Transferência',mei:'Migração MEI',baixa:'Baixa de Empresa',outros:'Outros Serviços'};
@@ -7428,7 +7449,7 @@ function montarContextoPortal(){
 
   // Onboarding
   try{
-    if(typeof clientesOnb !== 'undefined' && typeof ETAPAS_KANBAN_ONB !== 'undefined'){
+    if(_pode('onboarding') && typeof clientesOnb !== 'undefined' && typeof ETAPAS_KANBAN_ONB !== 'undefined'){
       const porEtapaOnb = {};
       ETAPAS_KANBAN_ONB.forEach(e=>porEtapaOnb[e.key]=0);
       clientesOnb.forEach(c=>{ if(porEtapaOnb[c.etapaAtual]!==undefined) porEtapaOnb[c.etapaAtual]++; });
@@ -7447,7 +7468,7 @@ function montarContextoPortal(){
 
   // Clientes (Operação)
   try{
-    if(typeof opClientes !== 'undefined'){
+    if(_pode('operacao') && typeof opClientes !== 'undefined'){
       const ativos = opClientes.filter(c=>c.ativo!==false);
       let txt = `CLIENTES (OPERAÇÃO): ${ativos.length} clientes ativos de ${opClientes.length} cadastrados no total (histórico completo).`
         + `\nIMPORTANTE — o campo "início" de cada cliente é o "início vínculo": a data em que o cliente EFETIVAMENTE passou a ter vínculo com a DMCON. Essa é a fonte OFICIAL e correta pra responder qualquer pergunta do tipo "quantos clientes eu fechei/entraram em tal mês" — use SEMPRE a contagem abaixo (por início vínculo), e NÃO a contagem de "leads fechados" do bloco COMERCIAL, que é só a venda sendo fechada e pode cair em mês diferente do início vínculo oficial. Se as duas contagens (Comercial x início vínculo) forem diferentes pro mesmo mês, informe o número do início vínculo como a resposta correta e pode mencionar a diferença como observação.`
@@ -7467,7 +7488,7 @@ function montarContextoPortal(){
 
   // Revisão de Contratos
   try{
-    if(typeof revisoesContratos !== 'undefined'){
+    if(_pode('revisao') && typeof revisoesContratos !== 'undefined'){
       const pendentes = revisoesContratos.filter(r=>!r.resolvido);
       const resolvidas = revisoesContratos.filter(r=>r.resolvido);
       const porPrior = {alta:0,media:0,baixa:0};
@@ -7487,7 +7508,7 @@ function montarContextoPortal(){
 
   // Comissões (processos societários com comissão + comissões manuais avulsas — mesma junção que a tela de Comissões faz)
   try{
-    if(typeof processosSoc !== 'undefined' && typeof comissoesExtras !== 'undefined'){
+    if(_pode('comissoes') && typeof processosSoc !== 'undefined' && typeof comissoesExtras !== 'undefined'){
       const fromProc = processosSoc.filter(p=>p.temComissao).map(p=>({nome:p.nome, parceiro:p.parceiro, comissaoPaga:p.comissaoPaga||false, origem:'processo societário'}));
       const fromManual = comissoesExtras.map(c=>({nome:c.nome, parceiro:c.parceiro, comissaoPaga:c.comissaoPaga||false, origem:'comissão avulsa'}));
       const todas = [...fromProc, ...fromManual];
@@ -7501,21 +7522,27 @@ function montarContextoPortal(){
 
   // Resumo geral / Dashboard — os MESMOS números que aparecem nos cards do Dashboard e no
   // painel de Alertas, calculados da mesma forma, pra IA nunca divergir do que a pessoa vê na tela.
+  // Resumo geral cruza dados de vários módulos (societário, revisão, clientes) — só entra pra
+  // quem tem Acesso de Gestor, senão poderia vazar números de módulo sem permissão pra alguém
+  // com acesso parcial (ex.: alguém só do Fiscal ficaria sabendo quantos contratos de prioridade
+  // alta estão pendentes no Societário, que ela nem deveria enxergar).
   try{
-    const partes = [];
-    if(typeof processosSoc !== 'undefined' && typeof socDiasAtraso === 'function'){
-      const qtdAtraso = processosSoc.filter(p=>p.status!=='finalizado' && p.status!=='concluido').map(p=>socDiasAtraso(p)).filter(d=>d!==null && d>0).length;
-      partes.push(`Processos societários fora do prazo agora: ${qtdAtraso}.`);
-    }
-    if(typeof revisoesContratos !== 'undefined'){
-      const altaPendente = revisoesContratos.filter(r=>!r.resolvido && r.prioridade==='alta').length;
-      partes.push(`Contratos de prioridade ALTA aguardando revisão agora: ${altaPendente}.`);
-    }
-    if(typeof opClientes !== 'undefined'){
-      partes.push(`Total de clientes ativos na base hoje: ${opClientes.filter(c=>c.ativo!==false).length}.`);
-    }
-    if(partes.length){
-      blocos.push('RESUMO GERAL (mesmos números do Dashboard e dos Alertas do Portal, hoje é ' + new Date().toLocaleDateString('pt-BR') + '): ' + partes.join(' '));
+    if(_temTotal){
+      const partes = [];
+      if(typeof processosSoc !== 'undefined' && typeof socDiasAtraso === 'function'){
+        const qtdAtraso = processosSoc.filter(p=>p.status!=='finalizado' && p.status!=='concluido').map(p=>socDiasAtraso(p)).filter(d=>d!==null && d>0).length;
+        partes.push(`Processos societários fora do prazo agora: ${qtdAtraso}.`);
+      }
+      if(typeof revisoesContratos !== 'undefined'){
+        const altaPendente = revisoesContratos.filter(r=>!r.resolvido && r.prioridade==='alta').length;
+        partes.push(`Contratos de prioridade ALTA aguardando revisão agora: ${altaPendente}.`);
+      }
+      if(typeof opClientes !== 'undefined'){
+        partes.push(`Total de clientes ativos na base hoje: ${opClientes.filter(c=>c.ativo!==false).length}.`);
+      }
+      if(partes.length){
+        blocos.push('RESUMO GERAL (mesmos números do Dashboard e dos Alertas do Portal, hoje é ' + new Date().toLocaleDateString('pt-BR') + '): ' + partes.join(' '));
+      }
     }
   } catch(e){ console.warn('Contexto IA (resumo geral):', e.message); }
 
