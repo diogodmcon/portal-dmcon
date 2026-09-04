@@ -1851,10 +1851,10 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
     <div class="topbar-left"><h1>📊 Fiscal</h1><p>Portal Operacional Fiscal · <span id="fiscal-mes-label">Junho 2026</span></p></div>
     <div class="topbar-right" id="fiscal-topbar-right">
       <button class="btn btn-ghost" onclick="exportarExcel('fiscal')" title="Exportar Excel">📥 Excel</button>
-      <select id="fiscal-mes-select" onchange="renderFiscalTable()" style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--text-primary);outline:none;cursor:pointer;">
+      <select id="fiscal-mes-select" onchange="fiscalSelecionarMes(parseInt(this.value))" style="display:none;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--text-primary);outline:none;cursor:pointer;">
         <option value="0">Janeiro</option><option value="1">Fevereiro</option>
         <option value="2">Março</option><option value="3">Abril</option>
-        <option value="4">Maio</option><option value="5" selected>Junho</option>
+        <option value="4">Maio</option><option value="5">Junho</option>
         <option value="6">Julho</option><option value="7">Agosto</option>
         <option value="8">Setembro</option><option value="9">Outubro</option>
         <option value="10">Novembro</option><option value="11">Dezembro</option>
@@ -1864,6 +1864,21 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
         <input class="search-input" placeholder="Buscar empresa, CNPJ, responsável..." oninput="fiscalBuscar(this.value)">
       </div>
     </div>
+  </div>
+  <!-- Mini seletor de mês — sempre visível no topo, clique troca o mês na hora -->
+  <div id="fiscal-mes-tabs" style="display:flex;gap:5px;padding:8px 24px;border-bottom:1px solid var(--border);background:var(--bg-sidebar);overflow-x:auto;flex-shrink:0;">
+    <div class="ftab fiscal-mes-pill" data-mes="0" onclick="fiscalSelecionarMes(0)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Jan</div>
+    <div class="ftab fiscal-mes-pill" data-mes="1" onclick="fiscalSelecionarMes(1)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Fev</div>
+    <div class="ftab fiscal-mes-pill" data-mes="2" onclick="fiscalSelecionarMes(2)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Mar</div>
+    <div class="ftab fiscal-mes-pill" data-mes="3" onclick="fiscalSelecionarMes(3)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Abr</div>
+    <div class="ftab fiscal-mes-pill" data-mes="4" onclick="fiscalSelecionarMes(4)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Mai</div>
+    <div class="ftab fiscal-mes-pill" data-mes="5" onclick="fiscalSelecionarMes(5)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Jun</div>
+    <div class="ftab fiscal-mes-pill" data-mes="6" onclick="fiscalSelecionarMes(6)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Jul</div>
+    <div class="ftab fiscal-mes-pill" data-mes="7" onclick="fiscalSelecionarMes(7)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Ago</div>
+    <div class="ftab fiscal-mes-pill" data-mes="8" onclick="fiscalSelecionarMes(8)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Set</div>
+    <div class="ftab fiscal-mes-pill" data-mes="9" onclick="fiscalSelecionarMes(9)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Out</div>
+    <div class="ftab fiscal-mes-pill" data-mes="10" onclick="fiscalSelecionarMes(10)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Nov</div>
+    <div class="ftab fiscal-mes-pill" data-mes="11" onclick="fiscalSelecionarMes(11)" style="padding:4px 10px;font-size:11px;flex-shrink:0;">Dez</div>
   </div>
   <!-- Sub-nav -->
   <div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg-sidebar);flex-shrink:0;padding:0 20px;overflow-x:auto;">
@@ -1903,15 +1918,20 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
         <option value="todos">Todos responsáveis</option>
       </select>
       <input id="fop-busca-apur" type="text" placeholder="🔎 Cód, nome, CNPJ ou responsável..." oninput="fiscalBuscar(this.value)" style="background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:11.5px;color:var(--text-primary);min-width:220px;">
-      <button class="conf-restrito conf-hidden" onclick="fopAbrirColaboradores()" style="margin-left:auto;padding:8px 14px;border-radius:7px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;">👥 Colaboradores</button>
+      <div style="display:flex;gap:2px;background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:2px;margin-left:auto;">
+        <div id="fiscal-view-lista" class="ftab" onclick="fiscalAlternarVisualizacao('lista')" style="border:none;padding:5px 10px;">☰ Lista</div>
+        <div id="fiscal-view-cards" class="ftab active" onclick="fiscalAlternarVisualizacao('cards')" style="border:none;padding:5px 10px;">▦ Cards</div>
+      </div>
+      <button class="conf-restrito conf-hidden" onclick="fopAbrirColaboradores()" style="padding:8px 14px;border-radius:7px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;">👥 Colaboradores</button>
       <button class="btn btn-primary" onclick="abrirCadastroEmpresa()">+ Nova Empresa</button>
       <button id="fop-btn-limpar" onclick="fopLimparDadosTeste()" style="display:none;padding:8px 14px;border-radius:7px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--red);font-size:12px;font-weight:600;cursor:pointer;" title="Apaga apuracoes, tarefas e historico salvos">🗑️ Limpar dados de teste</button>
     </div>
     <div style="flex:1;overflow:auto;border-top:1px solid var(--border);">
-      <table id="fiscal-table" style="border-collapse:separate;border-spacing:0;font-size:11.5px;white-space:nowrap;width:100%;min-width:1200px;">
+      <table id="fiscal-table" style="display:none;border-collapse:separate;border-spacing:0;font-size:11.5px;white-space:nowrap;width:100%;min-width:1200px;">
         <thead id="fiscal-thead"></thead>
         <tbody id="fiscal-tbody"></tbody>
       </table>
+      <div id="fiscal-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px 24px;"></div>
     </div>
   </div>
 
@@ -9250,6 +9270,30 @@ function fopCarregar() {
 }
 function fopGetUsuario() { const el=document.querySelector('.user-name'); return el?el.textContent.trim():'Usuário'; }
 function fopGetMes() { const el=document.getElementById('fiscal-mes-select'); return el?parseInt(el.value):new Date().getMonth(); }
+// Mini seletor de mês do topo do Fiscal (12 abinhas: Jan..Dez) — clicar troca o mês guardado
+// no <select id="fiscal-mes-select"> (que fica escondido, só guarda o estado) e re-renderiza
+// a tabela da aba que estiver ativa (Apurações ou Obrigações Acessórias).
+function fiscalAtualizarPillsMes(mes) {
+  document.querySelectorAll('#fiscal-mes-tabs .fiscal-mes-pill').forEach(p=>{
+    p.classList.toggle('active', parseInt(p.dataset.mes)===mes);
+  });
+}
+function fiscalSelecionarMes(mes) {
+  const sel=document.getElementById('fiscal-mes-select');
+  if(sel) sel.value=mes;
+  fiscalAtualizarPillsMes(mes);
+  const subAtiva=document.querySelector('#page-fiscal .fsub.active');
+  const tabAtiva=subAtiva?subAtiva.id.replace('fsub-',''):'apuracoes';
+  if(tabAtiva==='acessorias') renderFiscalTableAcess();
+  else renderFiscalTable();
+}
+// Ao carregar a página, o Fiscal sempre abre no mês ATUAL de verdade (não fica preso em
+// um mês fixo digitado no código) — só corrige o valor guardado, quem decide o que mostrar
+// na tela é renderFiscalTable()/renderFiscalTableAcess(), chamadas quando o usuário entra no módulo.
+window.addEventListener('load', ()=>{
+  const sel=document.getElementById('fiscal-mes-select');
+  if(sel){ sel.value=new Date().getMonth(); fiscalAtualizarPillsMes(new Date().getMonth()); }
+});
 function fopGetKey(cnpj) { const m=String(fopGetMes()+1).padStart(2,'0'); return `${cnpj}_${new Date().getFullYear()}_${m}`; }
 // fam='acess' lê/escreve em fopApurAcess (aba "Obrigações Acessórias") em vez de fopApur (aba "Apurações").
 // Omitido (undefined) = comportamento de sempre, pra não precisar tocar nas dezenas de chamadas já existentes.
@@ -9373,6 +9417,8 @@ function fiscalTab(tab, el) {
   if(kpi) kpi.style.display=tab==='apuracoes'?'':'none';
   const tr=document.getElementById('fiscal-topbar-right');
   if(tr) tr.style.display=tab==='apuracoes'?'':'none';
+  const mt=document.getElementById('fiscal-mes-tabs');
+  if(mt) mt.style.display=(tab==='apuracoes'||tab==='acessorias')?'flex':'none';
   if((tab==='conferencia'||tab==='finalizados'||tab==='historico'||tab==='tarefas'||tab==='configfiscal'||tab==='gerencial')&&!fopIsConferente()){
     mostrarToast('🔒 Acesso restrito — somente conferentes');
     const apurNav=document.querySelector(".fsnav[onclick*=\"fiscalTab('apuracoes'\"]");
@@ -9611,11 +9657,65 @@ function fopSalvarConfigFiscal(){
   fopRenderConfigFiscal();
 }
 
+// Visualização da aba Apurações: 'lista' (tabela, padrão) ou 'cards' (grade de cartões,
+// mesmo estilo usado no Onboarding). renderFiscalTable() sempre monta os dois (fiscalRenderGrid
+// é chamado de dentro dela) — trocar de visualização só troca qual dos dois fica visível.
+let fiscalVisualizacao='cards';
+function fiscalAlternarVisualizacao(modo){
+  fiscalVisualizacao=modo;
+  const tbl=document.getElementById('fiscal-table');
+  const grid=document.getElementById('fiscal-grid');
+  if(tbl) tbl.style.display = modo==='lista' ? '' : 'none';
+  if(grid) grid.style.display = modo==='cards' ? 'grid' : 'none';
+  const bL=document.getElementById('fiscal-view-lista'), bC=document.getElementById('fiscal-view-cards');
+  if(bL) bL.classList.toggle('active', modo==='lista');
+  if(bC) bC.classList.toggle('active', modo==='cards');
+}
+function fiscalRenderGrid(lista){
+  const grid=document.getElementById('fiscal-grid');
+  if(!grid) return;
+  if(!lista.length){
+    grid.innerHTML=`<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-muted);">Nenhuma empresa encontrada</div>`;
+    return;
+  }
+  grid.innerHTML=lista.map(c=>{
+    const apur=fopGetApur(c.cnpj);
+    const imps=fopGetImpostos(c);
+    const resp=(c.respMes||'').split('-')[0].trim();
+    const _classe=fopClassificarEmpresa(c);
+    const _ci=FOP_CLASSE_INFO[_classe]||FOP_CLASSE_INFO.apurando;
+    const _totalRot=imps.length;
+    const _doneRot=imps.filter(imp=>{const st=(apur[imp]||{}).status||''; return st==='finalizado'||st==='na';}).length;
+    let _pt=(fopParticOverride[c.cnpj]!==undefined?fopParticOverride[c.cnpj]:(c.particularidades||'')).trim();
+    if(_pt==='-') _pt='';
+    return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="min-width:0;">
+          <div style="font-size:13.5px;font-weight:700;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(c.nome||'').replace(/"/g,'&quot;')}">${c.nome||''}</div>
+          <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">Cód ${c.cod||''} · ${c.cidade||''}${c.uf?' · '+c.uf:''}</div>
+        </div>
+        ${fopBadgeRegime(c.tributacao)}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-soft);">
+        <span>👤 ${resp||'—'}</span>
+        ${fopIsConferente()?`<button onclick="event.stopPropagation();fopAbrirConfigFiscal('${c.cnpj}')" title="Editar configuração fiscal" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0;opacity:.6;">⚙️</button>`:''}
+      </div>
+      ${_pt?`<div><span class="fpartic-chip" style="background:rgba(255,140,66,.1);color:var(--orange);" title="${_pt.replace(/"/g,'&quot;')}">⚠️ ${_pt}</span></div>`:''}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px;padding-top:8px;border-top:1px solid var(--border);">
+        <button class="frot-btn" onclick="fopAbrirRotinas('${c.cnpj}')" title="${_ci.label} · ${_doneRot}/${_totalRot} rotinas concluídas">
+          <span class="fdot" style="background:${_ci.color};color:${_ci.color};"></span>
+          <span>${_doneRot}/${_totalRot} rotinas</span>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
 function renderFiscalTable() {
   const mes=fopGetMes();
   const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const lbl=document.getElementById('fiscal-mes-label');
   if(lbl) lbl.textContent=MESES[mes]+' '+new Date().getFullYear();
+  fiscalAtualizarPillsMes(mes);
 
   // Filtro por responsável do usuário logado
   const _fopAllBase=fopBuildClientes();
@@ -9644,6 +9744,8 @@ function renderFiscalTable() {
     }
     return true;
   });
+
+  fiscalRenderGrid(lista);
 
   // KPIs — cada empresa cai em EXATAMENTE 1 balde (mutuamente exclusivo),
   // assim os numeros sempre somam certo e saem do balde anterior corretamente
@@ -9752,6 +9854,11 @@ function fiscalBuscarAcess(v){ fopSearchAcess=v; renderFiscalTableAcess(); }
 function fiscalFiltrarRespAcess(v){ fopFiltroRespAcess=v; renderFiscalTableAcess(); }
 
 function renderFiscalTableAcess() {
+  const mes=fopGetMes();
+  const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const lbl=document.getElementById('fiscal-mes-label');
+  if(lbl) lbl.textContent=MESES[mes]+' '+new Date().getFullYear();
+  fiscalAtualizarPillsMes(mes);
   const _fopAllBase=fopBuildClientes();
   const _userResp=(typeof usuarioLogado!=='undefined'&&usuarioLogado&&usuarioLogado.fiscalResp)||null;
   const _baseResp=_userResp
