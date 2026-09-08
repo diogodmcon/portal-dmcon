@@ -165,6 +165,13 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
 [data-theme="light"] .modal-overlay{background:rgba(26,35,64,.5);}
 .modal-overlay.open{display:flex;}
 .modal{background:var(--bg-sidebar);border:1px solid var(--border-acc);border-radius:16px;width:560px;max-width:95vw;animation:fadeUp .3s ease;max-height:90vh;overflow-y:auto;}
+/* .modal-box é usado por várias telas de "⚙️ Configurar" (Fiscal, Contábil, editor de Checklist,
+   Apuração Mensal etc.) — antes não existia essa regra, então essas caixas ficavam SEM fundo
+   próprio (só o cabeçalho/.modal-header tinha fundo sólido) e deixavam o conteúdo meio "apagado",
+   transparente por cima do fundo desfocado da página — exatamente o que o Diogo reportou. Agora
+   tem o mesmo fundo opaco, borda e sombra do .modal padrão (só sem largura fixa, que cada tela
+   já define via style="max-width:...").*/
+.modal-box{background:var(--bg-sidebar);border:1px solid var(--border-acc);border-radius:16px;max-width:95vw;animation:fadeUp .3s ease;box-shadow:0 24px 60px rgba(0,0,0,.4);}
 .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:sticky;top:0;background:var(--bg-sidebar);z-index:1;}
 .modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text-primary);}
 .modal-sub{font-size:11.5px;color:var(--text-muted);margin-top:3px;}
@@ -663,6 +670,10 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
       Clientes <span class="nav-badge nb-green" id="badge-op" style="display:none">0</span>
     </div>
     <div class="nav-section" style="margin-top:10px">Módulos</div>
+    <div class="nav-item" onclick="navegar('contabil',this)" data-page="contabil">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="12" y2="15"/></svg>
+      Contábil <span class="nav-badge nb-cyan" id="badge-contabil" style="display:none">0</span>
+    </div>
     <div class="nav-item" onclick="navegar('fiscal',this)" data-page="fiscal">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       Fiscal <span class="nav-badge nb-red" id="badge-fiscal" style="display:none">0</span>
@@ -1885,6 +1896,98 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
   </div>
 </div>
 
+<!-- ── CONTÁBIL ── -->
+<div class="page" id="page-contabil">
+  <div class="topbar">
+    <div class="topbar-left"><h1>🧮 Contábil</h1><p>Empresas do setor contábil</p></div>
+  </div>
+  <div class="filtros-bar" style="gap:6px;">
+    <div class="fsnav active" onclick="contTab('empresas',this)">📋 Empresas <span id="contabil-badge-empresas" style="display:none;margin-left:4px;background:rgba(0,170,221,.18);color:var(--cyan);border-radius:8px;padding:1px 7px;font-size:10.5px;font-weight:700;">0</span></div>
+    <div class="fsnav" onclick="contTab('configurar',this)">⚙️ Configurar <span id="contabil-badge-cfg" style="display:none;margin-left:4px;background:rgba(245,158,11,.18);color:#fbbf24;border-radius:8px;padding:1px 7px;font-size:10.5px;font-weight:700;">0</span></div>
+    <div class="fsnav" onclick="contTab('checklist',this)">✅ Checklist</div>
+    <div class="fsnav" onclick="contTab('conferencia',this)">🔎 Conferência</div>
+    <div class="fsnav" onclick="contTab('gerencial',this)">📈 Gerencial</div>
+    <button onclick="contAbrirColaboradores()" style="margin-left:auto;padding:8px 14px;border-radius:7px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;">👥 Colaboradores</button>
+  </div>
+
+  <!-- ── EMPRESAS ── -->
+  <div id="contsub-empresas" class="fsub active">
+    <div class="kpi-strip" style="padding:14px 28px 0;">
+      <div class="kpi-mini k3" onclick="contAbrirConferenciaCard()" style="cursor:pointer;"><div class="kpi-lbl">Total de Empresas</div><div class="kpi-val" id="contabil-kpi-total">0</div><div class="kpi-tag tag-blue">ativas</div></div>
+      <div class="kpi-mini k3" onclick="contAbrirEmpresasCard()" style="cursor:pointer;"><div class="kpi-lbl">A Apurar</div><div class="kpi-val" id="contabil-kpi-apurar">0</div><div class="kpi-tag tag-warn">no mês</div></div>
+      <div class="kpi-mini k5" onclick="contAbrirConferenciaCard()" style="cursor:pointer;"><div class="kpi-lbl">Em Conferência</div><div class="kpi-val" id="contabil-kpi-conferencia">0</div><div class="kpi-tag" style="background:rgba(100,180,255,.12);color:#60a5fa;">conferir</div></div>
+      <div class="kpi-mini k2" onclick="contAbrirFinalizadosCard()" style="cursor:pointer;"><div class="kpi-lbl">Finalizadas</div><div class="kpi-val" id="contabil-kpi-finalizadas">0</div><div class="kpi-tag tag-up">no mês</div></div>
+    </div>
+    <div class="content">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Empresa</th><th>CNPJ</th>
+              <th style="text-align:center;">Jan</th><th style="text-align:center;">Fev</th><th style="text-align:center;">Mar</th><th style="text-align:center;">Abr</th>
+              <th style="text-align:center;">Mai</th><th style="text-align:center;">Jun</th><th style="text-align:center;">Jul</th><th style="text-align:center;">Ago</th>
+              <th style="text-align:center;">Set</th><th style="text-align:center;">Out</th><th style="text-align:center;">Nov</th><th style="text-align:center;">Dez</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="contabil-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFIGURAR ── -->
+  <div id="contsub-configurar" class="fsub">
+    <div style="padding:14px 28px 6px;font-size:12px;color:var(--text-muted);">Empresas novas que chegam do módulo Clientes caem aqui primeiro. Configure o responsável de cada uma para que ela passe a aparecer em Empresas.</div>
+    <div style="flex:1;overflow-y:auto;padding:12px 28px;">
+      <div id="contabil-configurar-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ── CHECKLIST MENSAL ── -->
+  <div id="contsub-checklist" class="fsub">
+    <div style="flex:1;overflow-y:auto;padding:20px 28px 24px;">
+      <div id="contabil-chk-lista"></div>
+    </div>
+  </div>
+
+  <!-- ── CONFERÊNCIA (igual ao Fiscal: só quem é conferente vê e aprova) ── -->
+  <div id="contsub-conferencia" class="fsub">
+    <div class="filtros-bar" style="gap:6px;padding-bottom:10px;">
+      <div class="ftab active" onclick="contConfFiltrar('disponivel',this)">🔵 Aguardando Conferência</div>
+      <div class="ftab" onclick="contConfFiltrar('finalizado',this)">✅ Finalizadas</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:12px 28px;">
+      <div id="contabil-conf-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ── GERENCIAL (igual ao Fiscal: ranking por responsável + painel de obrigações) ── -->
+  <div id="contsub-gerencial" class="fsub">
+    <div style="flex:1;overflow-y:auto;padding:16px 28px 20px;display:flex;flex-direction:column;gap:20px;">
+      <div id="contabil-gerencial-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text-primary);">📋 Obrigações (Checklists)</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:-10px;margin-bottom:14px;">Clique numa obrigação pra ver quais empresas a têm e o status de cada uma</div>
+        <div id="contabil-obrigacoes-painel"></div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text-primary);">👥 Desempenho por Responsável</div>
+        <div id="contabil-ranking" style="overflow-x:auto;"></div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text-primary);">🗂️ Obrigações Acessórias</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:-10px;margin-bottom:14px;">Categoria separada da rotina mensal — SPED Contábil, ECF, DCTFWeb, EFD-Reinf (configurável por empresa em "⚙️ Configurar")</div>
+        <div id="contabil-obrigacoes-acess-painel"></div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text-primary);">👥 Desempenho — Acessórias</div>
+        <div id="contabil-ranking-acess" style="overflow-x:auto;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── FISCAL ── -->
 <div class="page" id="page-fiscal">
   <!-- Topbar -->
@@ -2732,7 +2835,7 @@ const HUB_MODULOS = [
 ];
 // Módulos "em desenvolvimento" — mesmo tratamento do 'conferencias': sempre visíveis pra todo
 // mundo, sem cadeado, sem checar permissão, só com o selo "Em breve" (ver renderHubModulos()).
-const HUB_MODULOS_EM_BREVE = ['conferencias','whatsapp','comunicados','monitor_contabil','portal_cliente','cofre_nf','financeiro','rh','dp','contabil'];
+const HUB_MODULOS_EM_BREVE = ['conferencias','whatsapp','comunicados','monitor_contabil','portal_cliente','cofre_nf','financeiro','rh','dp'];
 
 function renderHubModulos(){
   const grid = document.getElementById('hub-modulos-grid');
@@ -2851,6 +2954,7 @@ function navegar(pagina, el){
   if(page) page.classList.add('active');
   if(el) el.classList.add('active');
   if(pagina==='fiscal') setTimeout(()=>renderFiscalTable(),30);
+  if(pagina==='contabil') setTimeout(()=>contRenderTable(),30);
   if(pagina==='checklist'){ chkCarregar(); }
   if(pagina==='mensagens'){ carregarTodasMensagens().then(()=>renderMensagens()); }
   if(pagina==='dashboard'){ iniciarDashboardFiltro(); }
@@ -2873,6 +2977,7 @@ const ADM_MODULOS = [
   {key:'prazo',       label:'Fora do Prazo'},
   {key:'operacao',    label:'Clientes'},
   {key:'fiscal',      label:'Fiscal'},
+  {key:'contabil',    label:'Contábil'},
   {key:'comercial',   label:'Comercial'},
   {key:'societario',  label:'Societário'},
   {key:'onboarding',  label:'Onboarding'},
@@ -3143,6 +3248,30 @@ async function admToggleAtivoUsuario(usuarioLogin, novoAtivo){
 }
 
 // ── TEMA: gerenciado pela função toggleTheme() acima ──
+
+// ── CONTÁBIL: DADOS ─────────────────────────────────────
+// Igual ao fopFiscalConfigs do Fiscal: mapa por CNPJ normalizado, guardado no Supabase
+// (chave 'contabil_configs') junto com o resto do fiscal_* em fopSalvar()/fopCarregarSupa().
+let contConfigs = {};
+// Cadastro de colaboradores do Contábil (igual ao fopColaboradores do Fiscal) — lista simples de
+// nomes usada só pra popular o select "Responsável" do Contábil; independente do login/Usuários.
+// As permissões de verdade serão desenhadas depois, por nome de usuário, junto com o checklist.
+let contColaboradores = []; // [{id,nome,ativo}]
+let contColaboradorEditandoId = null; // id do colaborador com o campo de nome aberto pra edição no modal
+// Biblioteca de Checklists do Contábil — igual ao "Checklist" do Fiscal (chkLista): vários
+// checklists nomeados, cada um com vários itens (e cada item pode ter subtarefas). Cada empresa,
+// lá em "⚙️ Configurar", escolhe quais desses checklists valem pra ela (contConfigs[cnpj].checklists
+// = [id,...]) — uma empresa pode ter 1, vários ou nenhum, igual no Fiscal.
+let contChkLista = []; // [{id,nome,itens:[{nome,subitens:[]}],criadoPor,criadoEm}]
+// Progresso de cada empresa, em CADA checklist dela, em cada mês (igual ao fopApur do Fiscal, só
+// que por checklist em vez de por imposto): contApur[cnpj_checklistId_ano_mes] = {checklist:[bool,...]}
+let contApur = {};
+// Obrigações Acessórias (categoria à parte da rotina mensal, igual ao fopApurAcess do Fiscal — ver
+// CONT_ACESSORIAS mais abaixo): contApurAcess[cnpj_acessoriaId_ano_mes] = {marcado:'enviado'|'sem_movimento'|'', status:''|'finalizado'}
+let contApurAcess = {};
+// Cronômetro por (empresa + checklist + mês + colaborador) — igual ao fopTempos do Fiscal: obriga
+// ter o relógio rodando pra poder marcar os itens do checklist, e registra quanto tempo foi gasto.
+let contTempos = { ativos: {}, registros: [] };
 
 // ── OPERAÇÃO: DADOS ────────────────────────────────────
 let opClientes = [];
@@ -9478,6 +9607,12 @@ function fopSalvar() {
   try { localStorage.setItem('fopVencimentosManuais', JSON.stringify(fopVencimentosManuais)); } catch(e){}
   try { localStorage.setItem('fopApurAcess', JSON.stringify(fopApurAcess)); } catch(e){}
   try { localStorage.setItem('fopTempos', JSON.stringify(fopTempos)); } catch(e){}
+  try { localStorage.setItem('contConfigs', JSON.stringify(contConfigs)); } catch(e){}
+  try { localStorage.setItem('contColaboradores', JSON.stringify(contColaboradores)); } catch(e){}
+  try { localStorage.setItem('contChkLista', JSON.stringify(contChkLista)); } catch(e){}
+  try { localStorage.setItem('contApur', JSON.stringify(contApur)); } catch(e){}
+  try { localStorage.setItem('contApurAcess', JSON.stringify(contApurAcess)); } catch(e){}
+  try { localStorage.setItem('contTempos', JSON.stringify(contTempos)); } catch(e){}
   // Salvar no Supabase para sincronizar com todos os usuários
   fopSalvarChave('fiscal_apur', fopApur);
   fopSalvarChave('fiscal_tarefas', fopTarefas);
@@ -9489,6 +9624,12 @@ function fopSalvar() {
   fopSalvarChave('fiscal_vencimentos_manuais', fopVencimentosManuais);
   fopSalvarChave('fiscal_apur_acess', fopApurAcess);
   fopSalvarChave('fiscal_tempos', fopTempos);
+  fopSalvarChave('contabil_configs', contConfigs);
+  fopSalvarChave('contabil_colaboradores', contColaboradores);
+  fopSalvarChave('contabil_checklists', contChkLista);
+  fopSalvarChave('contabil_apur', contApur);
+  fopSalvarChave('contabil_apur_acess', contApurAcess);
+  fopSalvarChave('contabil_tempos', contTempos);
   // Snapshot enxuto (cnpj, nome, responsável, tributação, inscrição estadual) de toda empresa
   // ativa — usado só pelo robô de e-mail diário (netlify/functions/daily-email.js), que roda no
   // servidor e não tem acesso ao array FISCAL_CLIENTES_BASE (que só existe aqui no navegador).
@@ -9505,7 +9646,7 @@ function fopSalvar() {
 }
 async function fopCarregarSupa(){
   try {
-    const chaves = ['fiscal_apur','fiscal_tarefas','fiscal_historico','fiscal_partic','fiscal_configs','fiscal_prazos_internos','fiscal_colaboradores','fiscal_vencimentos_manuais','fiscal_apur_acess','fiscal_tempos'];
+    const chaves = ['fiscal_apur','fiscal_tarefas','fiscal_historico','fiscal_partic','fiscal_configs','fiscal_prazos_internos','fiscal_colaboradores','fiscal_vencimentos_manuais','fiscal_apur_acess','fiscal_tempos','contabil_configs','contabil_colaboradores','contabil_checklists','contabil_apur','contabil_apur_acess','contabil_tempos'];
     const { data } = await sb.from('configuracoes').select('chave,valor').in('chave', chaves);
     if(data && data.length){
       data.forEach(row=>{
@@ -9521,6 +9662,12 @@ async function fopCarregarSupa(){
           else if(row.chave==='fiscal_vencimentos_manuais') fopVencimentosManuais=val;
           else if(row.chave==='fiscal_apur_acess') fopApurAcess=val;
           else if(row.chave==='fiscal_tempos') fopTempos=val;
+          else if(row.chave==='contabil_configs') contConfigs=val;
+          else if(row.chave==='contabil_colaboradores') contColaboradores=val;
+          else if(row.chave==='contabil_checklists') contChkLista=val;
+          else if(row.chave==='contabil_apur') contApur=val;
+          else if(row.chave==='contabil_apur_acess') contApurAcess=val;
+          else if(row.chave==='contabil_tempos') contTempos=val;
         } catch(e){}
       });
       return true; // carregou do Supabase
@@ -9539,9 +9686,18 @@ function fopCarregar() {
   try { const d=localStorage.getItem('fopVencimentosManuais'); if(d) fopVencimentosManuais=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopApurAcess'); if(d) fopApurAcess=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopTempos'); if(d) fopTempos=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('contConfigs'); if(d) contConfigs=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('contColaboradores'); if(d) contColaboradores=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('contChkLista'); if(d) contChkLista=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('contApur'); if(d) contApur=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('contApurAcess'); if(d) contApurAcess=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('contTempos'); if(d) contTempos=JSON.parse(d); } catch(e){}
   if(!fopTempos || typeof fopTempos!=='object') fopTempos={ativos:{},registros:[]};
   if(!fopTempos.ativos) fopTempos.ativos={};
   if(!Array.isArray(fopTempos.registros)) fopTempos.registros=[];
+  if(!contTempos || typeof contTempos!=='object') contTempos={ativos:{},registros:[]};
+  if(!contTempos.ativos) contTempos.ativos={};
+  if(!Array.isArray(contTempos.registros)) contTempos.registros=[];
   // Sanitizar dados antigos: 'apurando' sem nenhum item marcado volta para '' (Não iniciado)
   Object.values(fopApur).forEach(mesObj=>{
     Object.values(mesObj).forEach(imp=>{
@@ -9643,7 +9799,12 @@ function fopEmpresaProntaConferencia(c){
   });
 }
 
-function fopGetImpostos(empresa) {
+// Ordem canônica das 9 obrigações "do mês" configuráveis por empresa (mesma ordem usada na
+// grade de checkboxes "⚙️ Configurar Fiscal" → seção "Obrigações desta empresa").
+const FOP_IMPS_CONFIG=['icms','fundos','ipi','pis_cofins','iss','retidos','irpj_csll','pgdas','das_mei'];
+// Cálculo automático padrão (por regime tributário + Inscrição Estadual) — é o que toda empresa
+// usa ATÉ alguém abrir "⚙️ Configurar Fiscal" e salvar uma lista explícita pra ela.
+function fopImpostosPadraoPorRegime(empresa){
   const t=(empresa.tributacao||'').toLowerCase().trim();
   const ie=(empresa.inscEst||'').trim();
   const temIE=ie&&ie!=='Isento'&&ie!=='SEM IE'&&ie!=='-'&&ie!=='';
@@ -9653,6 +9814,14 @@ function fopGetImpostos(empresa) {
   const base=['pis_cofins','iss','retidos','irpj_csll'];
   if(temIE) return ['icms','fundos','ipi',...base];
   return base;
+}
+// Quais obrigações (impostos) uma empresa realmente tem. Se alguém já configurou explicitamente
+// em "⚙️ Configurar Fiscal" (empresa.impostos é um array — mesmo vazio), é isso que vale — é o que
+// permite tirar (ou incluir) uma obrigação específica de uma empresa, tipo tirar "PIS/COFINS" e
+// "Retidos" de uma que não precisa. Sem configuração explícita, cai no cálculo automático por regime.
+function fopGetImpostos(empresa) {
+  if(Array.isArray(empresa.impostos)) return FOP_IMPS_CONFIG.filter(i=>empresa.impostos.includes(i));
+  return fopImpostosPadraoPorRegime(empresa);
 }
 
 // Obrigações Acessórias por empresa — regras (Regime Normal = Lucro Presumido, Lucro Real e Associações):
@@ -9773,6 +9942,1422 @@ function fopBuildClientes(){
   });
 }
 
+// ══════════════════════════════════════════════════════
+// MÓDULO CONTÁBIL — fase 1 (estrutura base)
+// Mesma lógica do fopBuildClientes()/fopAbrirConfigFiscal() do Fiscal: toda empresa ativa da
+// Operação aparece aqui; quem ainda não tem config em contConfigs fica "pendente" (cai na aba
+// Configurar) até alguém do Contábil definir o responsável. As etapas seguintes (máquina de
+// estados por mês, tarefas, cronômetro, pool de revisão, declarações) entram em rodadas futuras.
+function contNormCnpj(cnpj){ return fopNormCnpj(cnpj); }
+
+function contBuildClientes(){
+  return (typeof opClientes!=='undefined'?opClientes:[]).filter(op=>op.ativo!==false).map(op=>{
+    const k=contNormCnpj(op.cnpj);
+    const cc=contConfigs[k];
+    if(cc && !cc.resetado) return cc;
+    return {
+      cod: op.cod, nome: op.nome, cnpj: op.cnpj, tributacao: op.regime||'',
+      uf: op.uf||'', cidade: op.cidade||'', responsavel: op.respContabil||'',
+      bancos: [], particularidades: '', pendente: true,
+    };
+  });
+}
+
+function contTab(tab, el){
+  contGarantirChecklistsGranulares();
+  document.querySelectorAll('#page-contabil .fsnav').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('#page-contabil .fsub').forEach(s=>s.classList.remove('active'));
+  if(el) el.classList.add('active');
+  const sub=document.getElementById('contsub-'+tab);
+  if(sub) sub.classList.add('active');
+  if(tab==='empresas') contRenderTable();
+  if(tab==='configurar') contRenderConfigList();
+  if(tab==='checklist') contChkRender();
+  if(tab==='conferencia') contRenderConferencia();
+  if(tab==='gerencial') contRenderGerencial();
+}
+
+// Card "A Apurar" do topo de Empresas — não tem tela própria (as bolinhas do mês na própria
+// grade já mostram isso), então só garante que a aba Empresas está aberta.
+function contAbrirEmpresasCard(){
+  contTab('empresas', document.querySelector(".fsnav[onclick*=\"contTab('empresas'\"]"));
+}
+
+function contRenderTable(){
+  const tbody=document.getElementById('contabil-tbody');
+  if(!tbody) return;
+  // Por enquanto todo mundo com acesso ao Contábil vê todas as empresas — sem filtro por
+  // responsável/cargo. As permissões (quem vê o quê) serão desenhadas depois, junto com o
+  // checklist e o fluxograma de aprovações, por nome de usuário.
+  const lista=contBuildClientes().filter(c=>!c.pendente&&!c.semContabil);
+  const pendentes=contBuildClientes().filter(c=>c.pendente);
+
+  const badgeCfg=document.getElementById('contabil-badge-cfg');
+  if(badgeCfg){ badgeCfg.textContent=pendentes.length; badgeCfg.style.display=pendentes.length?'':'none'; }
+  const badgeEmp=document.getElementById('contabil-badge-empresas');
+  if(badgeEmp){ badgeEmp.textContent=lista.length; badgeEmp.style.display=lista.length?'':'none'; }
+  const badgeNav=document.getElementById('badge-contabil');
+  if(badgeNav){ badgeNav.textContent=pendentes.length; badgeNav.style.display=pendentes.length?'inline':'none'; }
+
+  // KPIs do topo (Total / A Apurar / Em Conferência / Finalizadas) — sempre do mês atual,
+  // igual ao Fiscal. Cada empresa cai num balde só (mutuamente exclusivo): 'apurando' (inclui
+  // quem nem começou), 'disponivel' (100% do analista, aguardando conferente aprovar) ou
+  // 'finalizado' (já conferido). Empresa sem nenhum checklist ainda ('na') não entra em
+  // nenhum dos 3 baldes, só no Total.
+  const _hoje=new Date(), _anoK=_hoje.getFullYear(), _mesK=_hoje.getMonth()+1;
+  let _kApurar=0, _kConf=0, _kFin=0;
+  lista.forEach(c=>{
+    const _classe=contClassificarEmpresa(c.cnpj,_anoK,_mesK);
+    if(_classe==='apurando') _kApurar++;
+    else if(_classe==='disponivel') _kConf++;
+    else if(_classe==='finalizado') _kFin++;
+  });
+  ['contabil-kpi-total','contabil-kpi-apurar','contabil-kpi-conferencia','contabil-kpi-finalizadas']
+    .forEach((id,ix)=>{ const elk=document.getElementById(id); if(elk) elk.textContent=[lista.length,_kApurar,_kConf,_kFin][ix]; });
+
+  if(!lista.length){
+    tbody.innerHTML=`<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted);">Nenhuma empresa configurada no Contábil ainda${pendentes.length?' — veja a aba "Configurar" ('+pendentes.length+')':''}.</td></tr>`;
+    return;
+  }
+  const anoAtual=new Date().getFullYear();
+  tbody.innerHTML=lista.map(c=>{
+    const meses=[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>{
+      const st=contStatusMes(c.cnpj,anoAtual,m);
+      const cor=CONT_STATUS_COR[st];
+      const borda=st==='naofeito'?'1.5px solid var(--border)':'1.5px solid '+cor;
+      return `<td style="text-align:center;padding:6px 4px;"><span onclick="contAbrirApuracaoMes('${c.cnpj}',${anoAtual},${m})" title="${CONT_MES_NOME[m]}/${anoAtual} — ${CONT_STATUS_LABEL[st]}" style="display:inline-block;width:15px;height:15px;border-radius:50%;cursor:pointer;background:${cor};border:${borda};"></span></td>`;
+    }).join('');
+    return `<tr>
+      <td style="font-size:12.5px;font-weight:600;">${c.nome||''}</td>
+      <td style="font-size:11.5px;">${fopFmtCNPJ(c.cnpj)}</td>
+      ${meses}
+      <td><button onclick="contAbrirConfigContabil('${c.cnpj}')" style="padding:5px 12px;border-radius:7px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-soft);font-size:11px;cursor:pointer;white-space:nowrap;">Editar</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function contRenderConfigList(){
+  const el=document.getElementById('contabil-configurar-list');
+  if(!el) return;
+  const pendentes=contBuildClientes().filter(c=>c.pendente);
+  const badgeCfg=document.getElementById('contabil-badge-cfg');
+  if(badgeCfg){ badgeCfg.textContent=pendentes.length; badgeCfg.style.display=pendentes.length?'':'none'; }
+  const badgeNav=document.getElementById('badge-contabil');
+  if(badgeNav){ badgeNav.textContent=pendentes.length; badgeNav.style.display=pendentes.length?'inline':'none'; }
+  if(!pendentes.length){
+    el.innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">✅ <div style="margin-top:8px;font-size:13px;">Nenhuma empresa aguardando configuração no Contábil.</div></div>`;
+    return;
+  }
+  el.innerHTML=pendentes.map(c=>`
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+        <span style="font-size:11px;font-weight:700;color:var(--text-muted);flex-shrink:0;">#${c.cod||''}</span>
+        <div style="min-width:0;">
+          <div style="font-size:13.5px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.nome||''}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${fopFmtCNPJ(c.cnpj)}${c.cidade?' · '+c.cidade:''}${c.uf?' · '+c.uf:''}${c.tributacao?' · '+c.tributacao:''}</div>
+        </div>
+      </div>
+      <button onclick="contAbrirConfigContabil('${c.cnpj}')" style="padding:7px 16px;border-radius:8px;background:rgba(0,170,221,.12);border:1px solid rgba(0,170,221,.3);color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">⚙️ Configurar Contábil</button>
+    </div>`).join('');
+}
+
+// Preenche o select de responsável com os colaboradores do Contábil cadastrados em
+// "Colaboradores Contábeis" (contColaboradores) — mesmo mecanismo do fopPopularSelectMcfResp()
+// do Fiscal, independente do login/Usuários. Passe desiredValue pra forçar o valor selecionado
+// (ex: o responsável já salvo daquela empresa); sem esse parâmetro, preserva o que já estava.
+function contPopularSelectResp(desiredValue){
+  const sel=document.getElementById('mcc-resp');
+  if(!sel) return;
+  contSeedColaboradoresSeNecessario();
+  const atual=desiredValue!==undefined?desiredValue:sel.value;
+  const ativos=contColaboradores.filter(c=>c.ativo).map(c=>c.nome).sort((a,b)=>(a||'').localeCompare(b||'','pt-BR'));
+  sel.innerHTML=`<option value="">— Selecione o responsável —</option>`+ativos.map(n=>`<option value="${n}">${n}</option>`).join('');
+  if(!atual||ativos.includes(atual)) sel.value=atual||'';
+  else { const opt=document.createElement('option'); opt.value=atual; opt.textContent=atual+' (inativo)'; sel.appendChild(opt); sel.value=atual; }
+}
+
+function contAbrirConfigContabil(cnpj){
+  const c=(typeof opClientes!=='undefined'?opClientes:[]).find(x=>fopNormCnpj(x.cnpj)===fopNormCnpj(cnpj));
+  if(!c){ mostrarToast('Cliente não encontrado'); return; }
+  const modal=document.getElementById('modal-config-contabil');
+  if(!modal) return;
+  contGarantirChecklistsGranulares();
+  document.getElementById('mcc-titulo').textContent=c.nome;
+  document.getElementById('mcc-cnpj').value=cnpj;
+  const k=contNormCnpj(cnpj);
+  const cfgExist=(contConfigs[k]&&!contConfigs[k].resetado)?contConfigs[k]:null;
+  document.getElementById('mcc-sem-contabil').checked=cfgExist?!!cfgExist.semContabil:false;
+  contPopularSelectResp(cfgExist?(cfgExist.responsavel||''):(c.respContabil||''));
+  document.getElementById('mcc-bancos').value=cfgExist&&Array.isArray(cfgExist.bancos)?cfgExist.bancos.join(', '):'';
+  document.getElementById('mcc-partic').value=cfgExist?(cfgExist.particularidades||''):'';
+  // Grid de checklists — igual ao #mcf-impostos-grid do Fiscal, só que aqui os checklists vêm
+  // da biblioteca própria do Contábil (contChkLista), guardada no blob "configuracoes".
+  const grid=document.getElementById('mcc-checklists-grid');
+  const chksSel=cfgExist&&Array.isArray(cfgExist.checklists)?cfgExist.checklists:[];
+  if(grid){
+    if(contChkLista.length){
+      grid.innerHTML=contChkLista.map(chk=>`
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:var(--bg-card-hover);border:1px solid var(--border);cursor:pointer;">
+          <input type="checkbox" name="mcc-chk" value="${chk.id}" ${chksSel.includes(chk.id)?"checked":""}
+            style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer;">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary);">${chk.nome}</div>
+            <div style="font-size:10px;color:var(--text-muted);">${contChecklistLeaves(chk).length} itens</div>
+          </div>
+        </label>`).join('');
+    } else {
+      grid.innerHTML=`<div style="color:var(--text-muted);font-size:12px;padding:8px;grid-column:1/-1;">Nenhum checklist cadastrado ainda. Vá em <b>✅ Checklist</b> no menu para criar.</div>`;
+    }
+  }
+  // Grid de Obrigações Acessórias — igual ao de cima, só que pra biblioteca separada CONT_ACESSORIAS
+  // (SPED Contábil, ECF, DCTFWeb, EFD-Reinf — mesma ideia do "🗂️ Obrigações Acessórias" do Fiscal,
+  // uma categoria à parte da rotina mensal).
+  const gridAc=document.getElementById('mcc-acessorias-grid');
+  const acessSel=cfgExist&&Array.isArray(cfgExist.acessorias)?cfgExist.acessorias:[];
+  if(gridAc){
+    gridAc.innerHTML=CONT_ACESSORIAS.map(id=>`
+      <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:var(--bg-card-hover);border:1px solid var(--border);cursor:pointer;">
+        <input type="checkbox" name="mcc-acess" value="${id}" ${acessSel.includes(id)?"checked":""}
+          style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary);">${CONT_ACESSORIAS_LABEL[id]}</div>
+      </label>`).join('');
+  }
+  contToggleSemContabil(document.getElementById('mcc-sem-contabil').checked);
+  modal.classList.add('open');
+}
+
+function contToggleSemContabil(val){
+  document.getElementById('mcc-resp').disabled=val;
+  document.getElementById('mcc-bancos').disabled=val;
+  document.querySelectorAll('#mcc-checklists-grid input[type=checkbox]').forEach(cb=>cb.disabled=val);
+  document.querySelectorAll('#mcc-acessorias-grid input[type=checkbox]').forEach(cb=>cb.disabled=val);
+  const sec=document.getElementById('mcc-checklists-section');
+  if(sec) sec.style.opacity=val?'0.3':'1';
+  const secAc=document.getElementById('mcc-acessorias-section');
+  if(secAc) secAc.style.opacity=val?'0.3':'1';
+}
+
+function contSalvarConfigContabil(){
+  const cnpj=document.getElementById('mcc-cnpj').value;
+  const semContabil=document.getElementById('mcc-sem-contabil').checked;
+  const resp=document.getElementById('mcc-resp').value;
+  const bancos=document.getElementById('mcc-bancos').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const partic=document.getElementById('mcc-partic').value;
+  const checklistsSel=[];
+  document.querySelectorAll('#mcc-checklists-grid input[name=mcc-chk]:checked').forEach(cb=>checklistsSel.push(cb.value));
+  const acessoriasSel=[];
+  document.querySelectorAll('#mcc-acessorias-grid input[name=mcc-acess]:checked').forEach(cb=>acessoriasSel.push(cb.value));
+  const c=(typeof opClientes!=='undefined'?opClientes:[]).find(x=>fopNormCnpj(x.cnpj)===fopNormCnpj(cnpj));
+  if(!c){ mostrarToast('Erro: cliente não encontrado'); return; }
+  if(!semContabil && !resp){ mostrarToast('⚠️ Selecione um responsável ou marque "Sem Contábil"'); return; }
+
+  const config={
+    cod: c.cod, nome: c.nome, cnpj: c.cnpj, tributacao: c.regime||'',
+    uf: c.uf||'', cidade: c.cidade||'',
+    responsavel: semContabil?'':resp,
+    bancos: semContabil?[]:bancos,
+    checklists: semContabil?[]:checklistsSel,
+    acessorias: semContabil?[]:acessoriasSel,
+    particularidades: partic,
+    semContabil: semContabil,
+    configPor: (typeof usuarioLogado!=='undefined'&&usuarioLogado?usuarioLogado.usuario:''),
+    configEm: new Date().toISOString(),
+  };
+  contConfigs[contNormCnpj(cnpj)]=config;
+  fopSalvar();
+  document.getElementById('modal-config-contabil').classList.remove('open');
+  mostrarToast('✅ Configuração salva');
+  contRenderTable();
+  contRenderConfigList();
+}
+
+function contResetarConfigContabil(cnpj){
+  contConfigs[contNormCnpj(cnpj)]={resetado:true,pendente:true};
+  fopSalvar();
+  document.getElementById('modal-config-contabil').classList.remove('open');
+  contRenderTable();
+  contRenderConfigList();
+}
+
+// ── COLABORADORES CONTÁBEIS ──────────────────────────────────────────────
+// Mesmo mecanismo do fopColaboradores/fopAbrirColaboradores do Fiscal (ver acima): um cadastro
+// simples de nomes, independente do login/Usuários, usado só pra popular o select "Responsável"
+// do Contábil. As permissões de verdade (quem pode ver/editar o quê) serão desenhadas depois,
+// por nome de usuário, junto com o checklist do Contábil.
+
+// Colaboradores do Contábil = cadastro (contColaboradores) + nomes já usados no campo
+// "Responsável" das empresas (garante que ninguém suma da lista mesmo se ainda não foi cadastrado)
+function contColaboradoresContabil(){
+  const nomes=new Set();
+  contColaboradores.filter(c=>c.ativo).forEach(c=>nomes.add(c.nome));
+  contBuildClientes().filter(c=>!c.pendente).forEach(c=>{
+    if(c.responsavel) nomes.add(c.responsavel);
+  });
+  return [...nomes].sort();
+}
+
+// Garante que exista um cadastro inicial (só roda 1x, se ainda não houver nenhum colaborador salvo)
+function contSeedColaboradoresSeNecessario(){
+  if(contColaboradores.length) return;
+  const nomes=new Set();
+  contBuildClientes().filter(c=>!c.pendente).forEach(c=>{
+    if(c.responsavel) nomes.add(c.responsavel);
+  });
+  contColaboradores=[...nomes].filter(Boolean).sort().map(nome=>(
+    {id:'col_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), nome, ativo:true}
+  ));
+  fopSalvar();
+}
+
+// Cadastro de Colaboradores Contábeis — modal simples de adicionar/ativar-desativar/remover/renomear
+function contAbrirColaboradores(){
+  contSeedColaboradoresSeNecessario();
+  contColaboradorEditandoId = null;
+  contRenderColaboradores();
+  const m=document.getElementById('modal-colaboradores-contabil');
+  if(m) m.classList.add('open');
+}
+
+function contRenderColaboradores(){
+  const el=document.getElementById('colabcont-lista');
+  if(el){
+    const lista=[...contColaboradores].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    el.innerHTML = lista.length ? lista.map(c=>{
+      if(c.id===contColaboradorEditandoId){
+        return `<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg-card);border:1px solid var(--cyan);border-radius:8px;">
+          <input id="colabcont-editar-nome-${c.id}" type="text" value="${c.nome}" onkeydown="if(event.key==='Enter')contSalvarNomeColaborador('${c.id}');if(event.key==='Escape')contCancelarEdicaoColaborador();" style="flex:1;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--text-primary);">
+          <button onclick="contSalvarNomeColaborador('${c.id}')" style="padding:4px 10px;border-radius:6px;background:rgba(0,170,221,.15);border:1px solid rgba(0,170,221,.4);color:var(--cyan);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✓ Salvar</button>
+          <button onclick="contCancelarEdicaoColaborador()" style="padding:4px 10px;border-radius:6px;background:var(--bg-card-hover);border:1px solid var(--border);color:var(--text-muted);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">Cancelar</button>
+        </div>`;
+      }
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+        <span style="flex:1;font-size:13px;font-weight:600;color:${c.ativo?'var(--text-primary)':'var(--text-muted)'};${c.ativo?'':'text-decoration:line-through;'}">${c.nome}</span>
+        <button onclick="contEditarNomeColaborador('${c.id}')" title="Editar nome" style="padding:4px 8px;border-radius:6px;background:var(--bg-card-hover);border:1px solid var(--border);color:var(--text-soft);font-size:12px;cursor:pointer;">✏️</button>
+        <button onclick="contToggleColaborador('${c.id}')" style="padding:4px 10px;border-radius:6px;background:${c.ativo?'rgba(0,200,150,.12)':'var(--bg-card-hover)'};border:1px solid ${c.ativo?'rgba(0,200,150,.3)':'var(--border)'};color:${c.ativo?'var(--green)':'var(--text-muted)'};font-size:11px;font-weight:600;cursor:pointer;">${c.ativo?'✓ Ativo':'Inativo'}</button>
+        <button onclick="contRemoverColaborador('${c.id}')" title="Remover" style="padding:4px 8px;border-radius:6px;background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.25);color:var(--red);font-size:12px;cursor:pointer;">🗑️</button>
+      </div>`;
+    }).join('') : '<div style="text-align:center;padding:30px;color:var(--text-muted);">Nenhum colaborador cadastrado ainda.</div>';
+    if(contColaboradorEditandoId){
+      const inp=document.getElementById('colabcont-editar-nome-'+contColaboradorEditandoId);
+      if(inp){ inp.focus(); inp.select(); }
+    }
+  }
+  contPopularSelectResp();
+}
+
+function contEditarNomeColaborador(id){
+  contColaboradorEditandoId = id;
+  contRenderColaboradores();
+}
+
+function contCancelarEdicaoColaborador(){
+  contColaboradorEditandoId = null;
+  contRenderColaboradores();
+}
+
+// Renomeia um colaborador E atualiza automaticamente o "Responsável" de todas as empresas do
+// Contábil que hoje apontam pro nome antigo — sem precisar editar empresa por empresa. Diferente
+// do respMes do Fiscal, o campo "responsavel" do Contábil é sempre um nome simples (sem sufixo
+// depois de traço), então a troca aqui é um match/replace direto.
+async function contSalvarNomeColaborador(id){
+  const input = document.getElementById('colabcont-editar-nome-'+id);
+  if(!input) return;
+  const novoNome = (input.value||'').trim().toUpperCase();
+  const c = contColaboradores.find(x=>x.id===id);
+  if(!c) return;
+  if(!novoNome){ mostrarToast('Digite o nome'); return; }
+  if(novoNome === c.nome){ contColaboradorEditandoId=null; contRenderColaboradores(); return; }
+  if(contColaboradores.some(x=>x.id!==id && x.nome===novoNome)){ mostrarToast('⚠️ Já existe um colaborador com esse nome'); return; }
+
+  const nomeAntigo = c.nome;
+  const empresasAfetadas = contBuildClientes().filter(cli=>!cli.pendente && cli.responsavel===nomeAntigo);
+  const aviso = empresasAfetadas.length
+    ? `Renomear "${nomeAntigo}" para "${novoNome}"?\n\nIsso também vai atualizar automaticamente o responsável em ${empresasAfetadas.length} empresa(s) do Contábil que hoje estão com "${nomeAntigo}".`
+    : `Renomear "${nomeAntigo}" para "${novoNome}"?`;
+  if(!confirm(aviso)) return;
+
+  c.nome = novoNome;
+  empresasAfetadas.forEach(cli=>{
+    const k = contNormCnpj(cli.cnpj);
+    contConfigs[k] = { ...cli, responsavel: novoNome };
+  });
+
+  contColaboradorEditandoId = null;
+  fopSalvar();
+  contRenderColaboradores();
+  if(typeof contRenderTable==='function') contRenderTable();
+  mostrarToast(`✅ Renomeado(a) para "${novoNome}"` + (empresasAfetadas.length ? ` — ${empresasAfetadas.length} empresa(s) atualizada(s)` : ''));
+}
+
+function contAdicionarColaborador(){
+  const input=document.getElementById('colabcont-novo-nome');
+  if(!input) return;
+  const nome=(input.value||'').trim().toUpperCase();
+  if(!nome){ mostrarToast('Digite o nome do colaborador'); return; }
+  if(contColaboradores.some(c=>c.nome===nome)){ mostrarToast('⚠️ Esse colaborador já está cadastrado'); return; }
+  contColaboradores.push({id:'col_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), nome, ativo:true});
+  input.value='';
+  fopSalvar();
+  contRenderColaboradores();
+  mostrarToast('✅ '+nome+' cadastrado(a)');
+}
+
+function contToggleColaborador(id){
+  const c=contColaboradores.find(x=>x.id===id);
+  if(!c) return;
+  c.ativo=!c.ativo;
+  fopSalvar();
+  contRenderColaboradores();
+}
+
+function contRemoverColaborador(id){
+  const c=contColaboradores.find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm('Remover "'+c.nome+'" da lista de colaboradores?\n\nIsso não altera empresas que já estão atribuídas a ele(a) — só tira o nome da lista de seleção.')) return;
+  contColaboradores=contColaboradores.filter(x=>x.id!==id);
+  fopSalvar();
+  contRenderColaboradores();
+  mostrarToast('Colaborador removido da lista');
+}
+
+// ── CHECKLIST MENSAL CONTÁBIL ────────────────────────────────────────────
+// Igual ao Fiscal: vários checklists nomeados na biblioteca, cada empresa escolhe quais usa (1,
+// vários ou nenhum) em "⚙️ Configurar" — ver contChkLista logo abaixo. Uma lista inicial ("Rotina
+// Mensal", com a rotina padrão de contabilidade) é criada automaticamente na primeira vez — é só
+// um ponto de partida; dá pra editar, renomear, dividir em vários (✂️) ou excluir à vontade na
+// aba "✅ Checklist" do Contábil.
+// Cada item do checklist pode ter subtarefas (ex: "Conciliação bancária" tem dentro dela
+// "Importar extrato bancário" — não é um item separado, é uma etapa daquela rotina). Um item sem
+// subtarefas conta como 1 tarefa só; um item COM subtarefas vira uma tarefa por subtarefa (ver
+// contChecklistLeaves()). Aceita também o formato antigo (item = string simples), sem subtarefas.
+// ── BIBLIOTECA DE CHECKLISTS (igual ao "Checklist" do Fiscal — vários checklists nomeados, cada
+// um com vários itens — só que aqui um item pode ter subtarefas dentro dele, e a biblioteca fica
+// guardada junto no blob genérico "configuracoes" em vez de numa tabela própria) ──
+const CONT_CHECKLIST_PADRAO_ITENS = [
+  {nome:'Lançamentos contábeis do mês', subitens:[]},
+  {nome:'Conciliação bancária', subitens:['Importar extrato bancário']},
+  {nome:'Conferência de contas a pagar e a receber', subitens:[]},
+  {nome:'Apuração e conferência dos impostos', subitens:[]},
+  {nome:'Conferência da folha de pagamento / pró-labore', subitens:[]},
+  {nome:'Fechamento do balancete', subitens:[]},
+  {nome:'Envio de relatórios ao cliente', subitens:[]},
+];
+// Só roda 1x: se ainda não existir NENHUM checklist na biblioteca, cria um primeiro chamado
+// "Rotina Mensal" já com os itens padrão — o Diogo pode renomear/editar/excluir à vontade depois,
+// e criar quantos outros checklists quiser em "+ Novo Checklist".
+function contSeedChecklistsSeNecessario(){
+  if(!Array.isArray(contChkLista)) contChkLista=[];
+  if(contChkLista.length) return;
+  contChkLista.push({
+    id:'chk_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    nome:'Rotina Mensal',
+    itens:JSON.parse(JSON.stringify(CONT_CHECKLIST_PADRAO_ITENS)),
+    criadoPor:(typeof usuarioLogado!=='undefined'&&usuarioLogado?usuarioLogado.usuario:''),
+    criadoEm:new Date().toISOString(),
+  });
+  fopSalvar();
+}
+
+// Pedido do Diogo: ele não quer ver o pacote "Rotina Mensal" inteiro (tudo-ou-nada) em "⚙️
+// Configurar" — quer ver cada obrigação dela (Lançamentos, Conciliação bancária, Fechamento do
+// balancete etc) como uma opção separada, marcável empresa por empresa, igual ao Fiscal. Chamada
+// sempre que se entra em qualquer sub-aba do Contábil (ver contTab) — garante a semente inicial e,
+// automaticamente (sem precisar clicar em nada), divide esse checklist inicial em vários assim que
+// o vê pela 1ª vez. Só mexe nesse caso específico (biblioteca com EXATAMENTE 1 checklist, o
+// inicial, com mais de 1 item) — depois de dividido isso nunca mais bate, e um checklist novo que
+// o Diogo criar do zero com vários itens (de propósito) não é mexido por aqui, só pelo botão
+// manual "✂️ Dividir em separados".
+function contGarantirChecklistsGranulares(){
+  contSeedChecklistsSeNecessario();
+  if(contChkLista.length===1 && (contChkLista[0].itens||[]).length>1){
+    contChkDividirEmSeparados(contChkLista[0].id, true);
+  }
+}
+
+function contChkNomeDoItem(it){ return typeof it==='string'?it:((it&&it.nome)||''); }
+function contChkSubitensDoItem(it){ return (it&&Array.isArray(it.subitens))?it.subitens:[]; }
+function contChkPorId(chkId){ return contChkLista.find(c=>c.id===chkId); }
+
+// Achata os itens (+ subitens) de UM checklist específico numa lista só de "tarefas simples", na
+// ordem — é isso que vira o array de caixinhas marcadas em contApur[...].checklist DAQUELE
+// checklist. Um item sem subtarefas gera 1 tarefa; um item com subtarefas gera 1 tarefa por
+// subtarefa seguida (o item "pai" não conta como tarefa a mais, só as subtarefas dele).
+function contChecklistLeaves(checklist){
+  const leaves=[];
+  ((checklist&&checklist.itens)||[]).forEach((itRaw,idx)=>{
+    const nome=contChkNomeDoItem(itRaw);
+    const subitens=contChkSubitensDoItem(itRaw);
+    if(subitens.length){
+      subitens.forEach((sub,subIdx)=>leaves.push({label:sub, grupo:nome, itemIdx:idx, subIdx}));
+    } else {
+      leaves.push({label:nome, grupo:null, itemIdx:idx, subIdx:null});
+    }
+  });
+  return leaves;
+}
+
+function contChkRender(){
+  const el=document.getElementById('contabil-chk-lista'); if(!el) return;
+  contGarantirChecklistsGranulares();
+  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:16px;max-width:640px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:3px;">✅ Checklists do Contábil</div>
+        <div style="font-size:11.5px;color:var(--text-muted);">Cada checklist tem vários itens (um item pode ter subtarefas dentro, ex: "Importar extrato bancário" dentro de "Conciliação bancária"). Depois, em "⚙️ Configurar", você escolhe quais desses checklists cada empresa usa — uma empresa pode ter 1, vários ou nenhum.</div>
+      </div>
+      <button onclick="contChkCriarNovo()" style="padding:9px 16px;border-radius:8px;background:rgba(0,170,221,.12);border:1px solid rgba(0,170,221,.3);color:var(--cyan);font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ Novo Checklist</button>
+    </div>
+    ${contChkLista.map(chk=>contChkRenderCard(chk)).join('')}
+  </div>`;
+}
+
+function contChkRenderCard(chk){
+  const itens=chk.itens||[];
+  const nomeEsc=(chk.nome||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div style="font-size:13.5px;font-weight:700;color:var(--text-primary);">${chk.nome}</div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        ${itens.length>1?`<button onclick="contChkDividirEmSeparados('${chk.id}')" title="Dividir em um checklist separado pra cada item — daí cada empresa liga/desliga item por item, em vez de tudo junto" style="padding:5px 10px;border-radius:7px;background:rgba(0,170,221,.08);border:1px solid rgba(0,170,221,.25);color:var(--cyan);font-size:11.5px;cursor:pointer;">✂️ Dividir em separados</button>`:''}
+        <button onclick="contChkRenomear('${chk.id}')" title="Renomear" style="padding:5px 10px;border-radius:7px;background:var(--bg-card-hover);border:1px solid var(--border);color:var(--text-soft);font-size:11.5px;cursor:pointer;">✏️ Renomear</button>
+        <button onclick="contChkExcluir('${chk.id}','${nomeEsc}')" title="Excluir checklist" style="padding:5px 10px;border-radius:7px;background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.2);color:var(--red);font-size:12px;cursor:pointer;">🗑️</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${itens.length?itens.map((itRaw,idx)=>{
+        const nome=contChkNomeDoItem(itRaw);
+        const subitens=contChkSubitensDoItem(itRaw);
+        return `<div style="border-radius:8px;background:var(--bg-card-hover);border:1px solid var(--border);padding:8px 10px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="flex:1;font-size:12.5px;font-weight:600;color:var(--text-primary);">${nome}</span>
+            <button onclick="contChkRemoverItem('${chk.id}',${idx})" title="Remover item" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
+          </div>
+          ${subitens.length?`<div style="display:flex;flex-direction:column;gap:4px;margin:6px 0 4px 14px;">
+            ${subitens.map((sub,subIdx)=>`<div style="display:flex;align-items:center;gap:8px;">
+              <span style="flex:1;font-size:11.5px;color:var(--text-soft);">↳ ${sub}</span>
+              <button onclick="contChkRemoverSubitem('${chk.id}',${idx},${subIdx})" title="Remover subtarefa" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:0 4px;">✕</button>
+            </div>`).join('')}
+          </div>`:''}
+          <div style="display:flex;gap:6px;margin:6px 0 0 14px;">
+            <input type="text" id="contchk-${chk.id}-novo-sub-${idx}" placeholder="+ subtarefa dentro de &quot;${nome}&quot;..." onkeydown="if(event.key==='Enter')contChkAdicionarSubitem('${chk.id}',${idx})" style="flex:1;padding:6px 9px;border-radius:6px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:11.5px;">
+            <button onclick="contChkAdicionarSubitem('${chk.id}',${idx})" style="padding:6px 10px;border-radius:6px;background:rgba(0,170,221,.1);border:1px solid rgba(0,170,221,.25);color:var(--cyan);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Sub</button>
+          </div>
+        </div>`;
+      }).join(''):'<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12.5px;">Nenhum item ainda.</div>'}
+    </div>
+    <div style="display:flex;gap:8px;">
+      <input id="contchk-${chk.id}-novo-item" type="text" placeholder="Novo item deste checklist..." onkeydown="if(event.key==='Enter')contChkAdicionarItem('${chk.id}')" style="flex:1;padding:9px 12px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:13px;">
+      <button onclick="contChkAdicionarItem('${chk.id}')" style="padding:9px 16px;border-radius:8px;background:rgba(0,170,221,.12);border:1px solid rgba(0,170,221,.3);color:var(--cyan);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">+ Adicionar</button>
+    </div>
+  </div>`;
+}
+
+function contChkCriarNovo(){
+  const nome=(prompt('Nome do novo checklist:')||'').trim();
+  if(!nome) return;
+  contChkLista.push({
+    id:'chk_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    nome, itens:[],
+    criadoPor:(typeof usuarioLogado!=='undefined'&&usuarioLogado?usuarioLogado.usuario:''),
+    criadoEm:new Date().toISOString(),
+  });
+  fopSalvar();
+  contChkRender();
+  mostrarToast('✅ Checklist "'+nome+'" criado');
+}
+
+function contChkRenomear(chkId){
+  const chk=contChkPorId(chkId); if(!chk) return;
+  const nome=(prompt('Novo nome do checklist:', chk.nome)||'').trim();
+  if(!nome) return;
+  chk.nome=nome;
+  fopSalvar();
+  contChkRender();
+}
+
+function contChkExcluir(chkId, nome){
+  if(!confirm('Excluir o checklist "'+nome+'"? Isso também vai tirar ele de qualquer empresa que o usa. Não pode ser desfeito.')) return;
+  contChkLista=contChkLista.filter(c=>c.id!==chkId);
+  // Tira o checklist excluído da configuração de qualquer empresa que o usava
+  Object.values(contConfigs).forEach(cfg=>{
+    if(cfg&&Array.isArray(cfg.checklists)) cfg.checklists=cfg.checklists.filter(id=>id!==chkId);
+  });
+  fopSalvar();
+  contChkRender();
+  contRenderTable();
+  mostrarToast('🗑️ Checklist excluído');
+}
+
+// Pedido do Diogo: hoje um checklist é "tudo ou nada" por empresa (ex: "Rotina Mensal" com 8
+// itens — ou a empresa usa o pacote inteiro, ou não usa nenhum). Isso divide um checklist em UM
+// checklist separado pra cada item dele (mantendo eventuais subtarefas), pra empresa poder ligar/
+// desligar item por item — exatamente como já funciona no Fiscal (ICMS, PIS/COFINS etc, cada um
+// independente). Nenhuma empresa perde nada no processo: quem já tinha o checklist antigo marcado
+// passa a ter TODOS os novos marcados no lugar dele (dá pra desmarcar item por item depois), e o
+// histórico de meses já preenchidos é migrado junto (cada "caixinha" marcada vai pro novo
+// checklist certo).
+function contChkDividirEmSeparados(chkId, silencioso){
+  const chk=contChkPorId(chkId);
+  if(!chk) return;
+  const itens=chk.itens||[];
+  if(itens.length<2){ if(!silencioso) mostrarToast('Esse checklist já tem só 1 item — não tem o que dividir.'); return; }
+  if(!silencioso){
+    const nomes=itens.map(it=>contChkNomeDoItem(it));
+    if(!confirm('Dividir "'+chk.nome+'" em '+itens.length+' checklists separados, um pra cada item:\n\n— '+nomes.join('\n— ')+'\n\nToda empresa que já usa "'+chk.nome+'" continua com todos eles marcados (dá pra desmarcar item por item depois, empresa por empresa). O histórico de meses já preenchidos é preservado. Não pode ser desfeito. Continuar?')) return;
+  }
+
+  // 1) Um checklist novo pra cada item (com as subtarefas dele, se tiver)
+  const leavesAntigas=contChecklistLeaves(chk); // ordem exata das "caixinhas" salvas em contApur[...].checklist
+  const novos=itens.map((itRaw,idx)=>({
+    id:'chk_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'_'+idx,
+    nome: contChkNomeDoItem(itRaw),
+    itens:[ typeof itRaw==='string' ? {nome:itRaw,subitens:[]} : {nome:itRaw.nome, subitens:(itRaw.subitens||[]).slice()} ],
+    criadoPor:(typeof usuarioLogado!=='undefined'&&usuarioLogado?usuarioLogado.usuario:''),
+    criadoEm:new Date().toISOString(),
+  }));
+
+  // 2) Troca o checklist antigo pelos novos na biblioteca, na mesma posição
+  const pos=contChkLista.findIndex(c=>c.id===chkId);
+  contChkLista.splice(pos>=0?pos:contChkLista.length, pos>=0?1:0, ...novos);
+
+  // 3) Toda empresa que tinha o antigo marcado passa a ter todos os novos marcados no lugar dele
+  Object.values(contConfigs).forEach(cfg=>{
+    if(cfg&&Array.isArray(cfg.checklists)&&cfg.checklists.includes(chkId)){
+      cfg.checklists=cfg.checklists.filter(id=>id!==chkId).concat(novos.map(n=>n.id));
+    }
+  });
+
+  // 4) Migra o histórico de apuração mensal: separa o array de caixinhas marcadas do checklist
+  // antigo (uma por "folha", na ordem de leavesAntigas) num array próprio pra cada checklist novo.
+  const marcador='_'+chkId+'_';
+  Object.keys(contApur).forEach(key=>{
+    const pos2=key.indexOf(marcador);
+    if(pos2===-1) return;
+    const cnpjNorm=key.slice(0,pos2);
+    const resto=key.slice(pos2+marcador.length).split('_'); // [ano, mes]
+    const ano=resto[0], mes=resto[1];
+    const antigo=contApur[key];
+    if(antigo&&Array.isArray(antigo.checklist)){
+      novos.forEach((novoChk,itemIdx)=>{
+        const idxsDesseItem=leavesAntigas.map((l,i)=>l.itemIdx===itemIdx?i:-1).filter(i=>i>=0);
+        const novoBool=idxsDesseItem.map(i=>!!antigo.checklist[i]);
+        contApur[contApurKey(cnpjNorm, novoChk.id, ano, mes)]={checklist:novoBool};
+      });
+    }
+    delete contApur[key];
+  });
+
+  fopSalvar();
+  contChkRender();
+  contRenderTable();
+  if(!silencioso) mostrarToast('✂️ Dividido em '+novos.length+' checklists separados');
+}
+
+function contChkAdicionarItem(chkId){
+  const chk=contChkPorId(chkId); if(!chk) return;
+  const inp=document.getElementById('contchk-'+chkId+'-novo-item');
+  if(!inp) return;
+  const val=(inp.value||'').trim();
+  if(!val) return;
+  if(!Array.isArray(chk.itens)) chk.itens=[];
+  chk.itens.push({nome:val, subitens:[]});
+  fopSalvar();
+  contChkRender();
+  contRenderTable();
+}
+
+function contChkRemoverItem(chkId, idx){
+  const chk=contChkPorId(chkId); if(!chk) return;
+  chk.itens.splice(idx,1);
+  fopSalvar();
+  contChkRender();
+  contRenderTable();
+}
+
+function contChkAdicionarSubitem(chkId, idx){
+  const chk=contChkPorId(chkId); if(!chk) return;
+  const inp=document.getElementById('contchk-'+chkId+'-novo-sub-'+idx);
+  if(!inp) return;
+  const val=(inp.value||'').trim();
+  if(!val) return;
+  const it=chk.itens[idx];
+  if(!it) return;
+  if(typeof it==='string'){
+    chk.itens[idx]={nome:it, subitens:[val]};
+  } else {
+    if(!Array.isArray(it.subitens)) it.subitens=[];
+    it.subitens.push(val);
+  }
+  fopSalvar();
+  contChkRender();
+  contRenderTable();
+}
+
+function contChkRemoverSubitem(chkId, idx, subIdx){
+  const chk=contChkPorId(chkId); if(!chk) return;
+  const it=chk.itens[idx];
+  if(!it || typeof it==='string' || !Array.isArray(it.subitens)) return;
+  it.subitens.splice(subIdx,1);
+  fopSalvar();
+  contChkRender();
+  contRenderTable();
+}
+
+// ── QUAIS CHECKLISTS CADA EMPRESA USA ────────────────────────────────────
+// Lê contConfigs[cnpj].checklists (array de ids, escolhido em "⚙️ Configurar") e devolve os
+// checklists de verdade da biblioteca (já ignorando ids de checklists que porventura tenham sido excluídos).
+function contChecklistsDaEmpresa(cnpj){
+  const k=contNormCnpj(cnpj);
+  const cfg=contConfigs[k];
+  const ids=(cfg&&Array.isArray(cfg.checklists))?cfg.checklists:[];
+  return ids.map(id=>contChkPorId(id)).filter(Boolean);
+}
+
+// ── OBRIGAÇÕES ACESSÓRIAS (categoria à parte da rotina mensal — pedido do Diogo: "similar a do
+// fiscal") — igual ao FOP_ACESSORIAS/fopGetAcessorias do Fiscal: uma lista própria de declarações
+// (SPED Contábil, ECF, DCTFWeb, EFD-Reinf), marcadas manualmente por empresa em "⚙️ Configurar"
+// (aqui não tem cálculo automático por regime como o Fiscal tem — no Contábil tudo já é escolha
+// manual, então fica consistente com como os checklists da rotina mensal já funcionam). Cada uma é
+// bem mais simples que um checklist: só "Enviado" ou "Sem Movimento" no mês — sem checklist de
+// conferência/aprovação, igual ao Fiscal (acessórias não passam pela Conferência).
+const CONT_ACESSORIAS=['sped_contabil','ecf','dctfweb','efd_reinf'];
+const CONT_ACESSORIAS_LABEL={
+  sped_contabil:'SPED Contábil (ECD)',
+  ecf:'ECF',
+  dctfweb:'DCTFWeb',
+  efd_reinf:'EFD-Reinf',
+};
+function contAcessoriasDaEmpresa(cnpj){
+  const k=contNormCnpj(cnpj);
+  const cfg=contConfigs[k];
+  const ids=(cfg&&Array.isArray(cfg.acessorias))?cfg.acessorias:[];
+  return CONT_ACESSORIAS.filter(id=>ids.includes(id));
+}
+function contApurAcessKey(cnpj, acessId, ano, mes){
+  return contNormCnpj(cnpj)+'_'+acessId+'_'+ano+'_'+String(mes).padStart(2,'0');
+}
+function contGetApurAcess(cnpj, acessId, ano, mes){
+  const k=contApurAcessKey(cnpj,acessId,ano,mes);
+  if(!contApurAcess[k]) contApurAcess[k]={marcado:'',status:''};
+  return contApurAcess[k];
+}
+// Status de uma obrigação acessória no mês: '' (ainda não marcada) ou 'finalizado' (Enviado ou Sem
+// Movimento já marcado — não existe "disponivel"/conferência aqui, igual ao Fiscal).
+function contStatusAcessoria(cnpj, acessId, ano, mes){
+  const d=contApurAcess[contApurAcessKey(cnpj,acessId,ano,mes)];
+  return (d&&d.status==='finalizado')?'finalizado':'';
+}
+// Marca (ou desmarca, clicando de novo na mesma opção — pra corrigir erro de clique) uma obrigação
+// acessória como 'enviado' ou 'sem_movimento'. Ao contrário do checklist da rotina mensal, não passa
+// pelo cronômetro nem pela Conferência — marcar já finaliza direto (mesmo comportamento do Fiscal).
+function contMarcarAcessoria(cnpj, acessId, ano, mes, tipo){
+  const d=contGetApurAcess(cnpj,acessId,ano,mes);
+  if(d.marcado===tipo){ d.marcado=''; d.status=''; d.tsFim=null; }
+  else { d.marcado=tipo; d.status='finalizado'; d.tsFim=Date.now(); }
+  fopSalvar();
+  contRenderApuracaoItens();
+  contRenderTable();
+}
+// Classificação da empresa só pras Acessórias (painel separado no Gerencial) — 'na' (nenhuma
+// configurada), 'finalizado' (todas enviadas/sem movimento) ou 'apurando' (falta pelo menos 1).
+function contClassificarEmpresaAcess(cnpj, ano, mes){
+  const acs=contAcessoriasDaEmpresa(cnpj);
+  if(!acs.length) return 'na';
+  const sts=acs.map(id=>contStatusAcessoria(cnpj,id,ano,mes));
+  if(sts.every(s=>s==='finalizado')) return 'finalizado';
+  return 'apurando';
+}
+
+// ── APURAÇÃO MENSAL POR EMPRESA (grade Jan-Dez em "Empresas") ───────────
+const CONT_MES_NOME=['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const CONT_STATUS_COR={
+  concluido:'var(--green)',
+  fazendo:'#f5c518',
+  atrasado:'var(--red)',
+  naofeito:'transparent',
+};
+const CONT_STATUS_LABEL={
+  concluido:'Concluído',
+  fazendo:'Fazendo',
+  atrasado:'Atrasado',
+  naofeito:'Não feito',
+};
+
+function contApurKey(cnpj, checklistId, ano, mes){
+  return contNormCnpj(cnpj)+'_'+checklistId+'_'+ano+'_'+String(mes).padStart(2,'0');
+}
+function contGetApur(cnpj, checklistId, ano, mes){
+  const k=contApurKey(cnpj,checklistId,ano,mes);
+  if(!contApur[k]) contApur[k]={checklist:[]};
+  if(!Array.isArray(contApur[k].checklist)) contApur[k].checklist=[];
+  return contApur[k];
+}
+// Verde só quando TODOS os checklists da empresa estiverem 100% concluídos naquele mês (mesmo que
+// tenha passado do prazo); passado e incompleto = atrasado (vermelho); mês atual/futuro com algo
+// marcado = fazendo (amarelo); nada marcado (ou empresa sem nenhum checklist ainda) = não feito (branco).
+function contStatusMes(cnpj, ano, mes){
+  const checklists=contChecklistsDaEmpresa(cnpj);
+  if(!checklists.length) return 'naofeito';
+  let totalItens=0, feitos=0;
+  checklists.forEach(chk=>{
+    const leaves=contChecklistLeaves(chk);
+    totalItens+=leaves.length;
+    const d=contApur[contApurKey(cnpj,chk.id,ano,mes)];
+    feitos+=(d?(d.checklist||[]):[]).filter(Boolean).length;
+  });
+  if(totalItens>0 && feitos>=totalItens) return 'concluido';
+  const hoje=new Date();
+  const ehPassado=(ano<hoje.getFullYear())||(ano===hoje.getFullYear() && mes<(hoje.getMonth()+1));
+  if(ehPassado) return 'atrasado';
+  if(feitos>0) return 'fazendo';
+  return 'naofeito';
+}
+
+// ── CLASSIFICAÇÃO POR OBRIGAÇÃO/EMPRESA (base da Conferência + Gerencial) ────────────────
+// Status de UM checklist (uma "obrigação") de uma empresa num mês — sempre calculado a partir
+// das caixinhas marcadas, EXCETO quando já foi conferido e finalizado (aí fica travado em
+// 'finalizado' até alguém "reabrir", que por enquanto é feito só desmarcando o registro na mão).
+// '' = nada marcado ainda · 'apurando' = incompleto · 'disponivel' = 100% do analista, aguardando
+// o conferente aprovar · 'finalizado' = já conferido e aprovado · 'na' = esse checklist não tem
+// nenhum item (não deveria acontecer na prática, mas evita dividir por zero).
+function contStatusChecklist(cnpj, checklistId, ano, mes){
+  const chk=contChkPorId(checklistId);
+  const leaves=chk?contChecklistLeaves(chk):[];
+  if(!leaves.length) return 'na';
+  const d=contApur[contApurKey(cnpj,checklistId,ano,mes)];
+  if(d && d.status==='finalizado') return 'finalizado';
+  const marcados=(d&&Array.isArray(d.checklist))?d.checklist:[];
+  const feitos=marcados.filter(Boolean).length;
+  if(feitos>0 && feitos>=leaves.length) return 'disponivel';
+  if(feitos>0) return 'apurando';
+  return '';
+}
+// Classificação da EMPRESA no mês, olhando todos os checklists (obrigações) que ela tem
+// configurados — mesma lógica do fopClassificarEmpresa do Fiscal, só que num modelo mais simples
+// (sem "correção"/"aprovado" separados, já que o Contábil não tem esse fluxo de devolução por
+// enquanto): 'na' (não tem nenhuma obrigação configurada ainda), 'finalizado' (todas conferidas),
+// 'disponivel' (todas prontas — 100% do analista — só falta o conferente aprovar) ou 'apurando'
+// (tem pelo menos uma obrigação ainda incompleta ou nem começada).
+function contClassificarEmpresa(cnpj, ano, mes){
+  const checklists=contChecklistsDaEmpresa(cnpj);
+  const sts=checklists.map(chk=>contStatusChecklist(cnpj,chk.id,ano,mes)).filter(s=>s!=='na');
+  if(!sts.length) return 'na';
+  if(sts.every(s=>s==='finalizado')) return 'finalizado';
+  if(sts.every(s=>s==='disponivel'||s==='finalizado')) return 'disponivel';
+  return 'apurando';
+}
+// Igual ao fopIsConferente() do Fiscal: acesso total (gestor) ou marcação explícita liberam;
+// a lista fixa é reforço pra ninguém perder acesso enquanto o cadastro não é feito em Usuários.
+function contIsConferente(){
+  if(typeof usuarioLogado!=='undefined' && usuarioLogado && (usuarioLogado.total || usuarioLogado.contabilConferente)) return true;
+  const _u=(typeof usuarioLogado!=='undefined'&&usuarioLogado&&usuarioLogado.usuario||'').toUpperCase();
+  return _u==='NICOLAS'||_u==='MARILIA'||_u==='DIOGO'||_u==='MASTER';
+}
+// Checklist de conferência (do conferente, separado do checklist do analista) — mesma ideia do
+// CONF_CHECKLIST do Fiscal, só que sem a etapa "Enviar ao Cliente" (o Contábil não tem esse
+// conceito de envio separado — aprovar já finaliza direto).
+const CONT_CONF_CHECKLIST=['Revisar o checklist do analista','Verificar consistência dos lançamentos','Conferir saldos e documentos','Aprovar e finalizar'];
+let contConfExpandidos={};
+let contFiltroConf='disponivel';
+
+function contCheckConf(cnpj, checklistId, ano, mes, idx, val){
+  const d=contGetApur(cnpj,checklistId,ano,mes);
+  if(!Array.isArray(d.chkConf)) d.chkConf=CONT_CONF_CHECKLIST.map(()=>false);
+  d.chkConf[idx]=val;
+  fopSalvar();
+  // Marcou o último item ("Aprovar e finalizar") e todos os outros já estavam marcados -> aprova direto
+  if(val && idx===CONT_CONF_CHECKLIST.length-1 && CONT_CONF_CHECKLIST.every((_,i)=>d.chkConf[i])){
+    contAprovar(cnpj,checklistId,ano,mes);
+    return;
+  }
+  contRenderConferencia();
+}
+
+function contMarcarTodosConf(cnpj, checklistId, ano, mes){
+  const d=contGetApur(cnpj,checklistId,ano,mes);
+  d.chkConf=CONT_CONF_CHECKLIST.map(()=>true);
+  fopSalvar();
+  contAprovar(cnpj,checklistId,ano,mes);
+}
+
+function contAprovar(cnpj, checklistId, ano, mes){
+  if(!contIsConferente()){ mostrarToast('🔒 Apenas conferentes podem aprovar'); return; }
+  const d=contGetApur(cnpj,checklistId,ano,mes);
+  if(!CONT_CONF_CHECKLIST.every((_,i)=>(d.chkConf||[])[i])){
+    mostrarToast('⚠️ Conclua o checklist de conferência antes de aprovar'); return;
+  }
+  if(contStatusChecklist(cnpj,checklistId,ano,mes)!=='disponivel'){
+    mostrarToast('⚠️ Esse checklist ainda não está 100% concluído pelo analista'); return;
+  }
+  const chk=contChkPorId(checklistId);
+  d.status='finalizado';
+  d.confBy=(typeof usuarioLogado!=='undefined'&&usuarioLogado?usuarioLogado.usuario:'');
+  d.tsFim=Date.now();
+  fopSalvar();
+  mostrarToast('✅ '+(chk?chk.nome:'Checklist')+' conferido e finalizado!');
+  contRenderConferencia();
+  contRenderTable();
+}
+
+function contConfFiltrar(filtro, el){
+  contFiltroConf=filtro;
+  document.querySelectorAll('#contsub-conferencia .ftab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  contRenderConferencia();
+}
+
+function contAbrirConferenciaCard(){
+  if(contIsConferente()) contTab('conferencia', document.querySelector(".fsnav[onclick*=\"contTab('conferencia'\"]"));
+  else contAbrirEmpresasCard();
+}
+function contAbrirFinalizadosCard(){
+  if(!contIsConferente()){ contAbrirEmpresasCard(); return; }
+  contTab('conferencia', document.querySelector(".fsnav[onclick*=\"contTab('conferencia'\"]"));
+  setTimeout(()=>{ contConfFiltrar('finalizado', document.querySelector(`#contsub-conferencia .ftab[onclick*="contConfFiltrar('finalizado'"]`)); },30);
+}
+
+// Lista de espera pra aprovar (disponivel) ou já finalizadas — agrupada por empresa, igual ao
+// fopRenderConferencia do Fiscal, só que a "obrigação" aqui é cada checklist (já dividido em
+// itens separados — ver contGarantirChecklistsGranulares) em vez de cada imposto.
+function contRenderConferencia(){
+  const el=document.getElementById('contabil-conf-list');
+  if(!el) return;
+  if(!contIsConferente()){
+    el.innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">🔒 <div style="margin-top:8px;font-size:13px;">Acesso restrito — esta área é exclusiva dos conferentes.</div></div>`;
+    return;
+  }
+  const hoje=new Date(), ano=hoje.getFullYear(), mes=hoje.getMonth()+1;
+  const alvo=contFiltroConf==='finalizado'?'finalizado':'disponivel';
+  const porEmpresa=[];
+  contBuildClientes().filter(c=>!c.pendente&&!c.semContabil).forEach(c=>{
+    const obrigs=contChecklistsDaEmpresa(c.cnpj)
+      .filter(chk=>contStatusChecklist(c.cnpj,chk.id,ano,mes)===alvo)
+      .map(chk=>({chk, d:contGetApur(c.cnpj,chk.id,ano,mes)}));
+    if(obrigs.length) porEmpresa.push({c,obrigs});
+  });
+  if(!porEmpresa.length){ el.innerHTML=`<div style="text-align:center;padding:40px;color:var(--text-muted);">Nenhum item nesta categoria</div>`; return; }
+  el.innerHTML=porEmpresa.map(({c,obrigs})=>{
+    const totalOk=obrigs.filter(({d})=>CONT_CONF_CHECKLIST.every((_,i)=>(d.chkConf||[])[i])).length;
+    return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:2px;">
+      <div style="font-size:14px;font-weight:700;color:var(--text-primary);">${c.nome}</div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;margin-bottom:10px;">${fopFmtCNPJ(c.cnpj)} · Resp: ${c.responsavel||'—'} · ${obrigs.length} obrigaç${obrigs.length>1?'ões':'ão'}${alvo==='disponivel'?' · '+totalOk+'/'+obrigs.length+' prontas p/ aprovar':''}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;align-items:start;">
+        ${obrigs.map(({chk,d})=>{
+          const leaves=contChecklistLeaves(chk);
+          const done=(d.checklist||[]).filter(Boolean).length;
+          const _cc=(d.chkConf||[]);
+          const _ok=CONT_CONF_CHECKLIST.every((_,i)=>_cc[i]);
+          const _key=c.cnpj+'|'+chk.id;
+          return `<details ${contConfExpandidos[_key]?'open':''} ontoggle="contConfExpandidos['${_key}']=this.open" style="background:var(--bg-card-hover);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+            <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;user-select:none;">
+              <span style="font-size:10px;color:var(--text-muted);">▶</span>
+              <span style="font-size:12.5px;font-weight:600;color:var(--text-primary);flex:1;">${chk.nome}</span>
+              <span style="font-size:10.5px;color:var(--text-muted);">Analista: ${done}/${leaves.length}</span>
+              ${alvo==='disponivel'?`<span style="font-size:10.5px;color:${_ok?'var(--green)':'var(--text-muted)'};">${_ok?'✅ pronto':'⏳ '+_cc.filter(v=>v).length+'/'+CONT_CONF_CHECKLIST.length}</span>`:`<span style="font-size:10.5px;color:var(--green);">✅ finalizado</span>`}
+            </summary>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+              <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">
+                ${leaves.map((leaf,i)=>{
+                  const ch=(d.checklist||[])[i];
+                  return `<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:${ch?'rgba(0,200,150,.1)':'var(--bg-card)'};border:1px solid ${ch?'rgba(0,200,150,.3)':'var(--border)'};color:${ch?'var(--green)':'var(--text-muted)'};">${ch?'✅':'⬜'} ${leaf.label}</span>`;
+                }).join('')}
+              </div>
+              ${alvo==='disponivel'?`
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <div style="font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);">Checklist de Conferência</div>
+                ${!_ok?`<button onclick="contMarcarTodosConf('${c.cnpj}','${chk.id}',${ano},${mes})" style="font-size:10px;padding:3px 8px;border-radius:5px;background:rgba(0,170,221,.12);border:1px solid rgba(0,170,221,.3);color:var(--cyan);cursor:pointer;font-weight:600;">☑️ Marcar todos</button>`:''}
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;">
+                ${CONT_CONF_CHECKLIST.map((item,idx)=>{
+                  const ck=_cc[idx]||false;
+                  return `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:2px 0;">
+                    <input type="checkbox" ${ck?'checked':''} onchange="contCheckConf('${c.cnpj}','${chk.id}',${ano},${mes},${idx},this.checked)" style="width:14px;height:14px;accent-color:var(--cyan);cursor:pointer;">
+                    <span style="font-size:12px;color:${ck?'var(--text-muted)':'var(--text-primary)'};${ck?'text-decoration:line-through;':''}">${item}</span>
+                  </label>`;
+                }).join('')}
+              </div>
+              <button onclick="contAprovar('${c.cnpj}','${chk.id}',${ano},${mes})" ${_ok?'':'disabled'} style="padding:7px 14px;border-radius:7px;background:${_ok?'rgba(0,200,150,.15)':'var(--bg-card)'};border:1px solid ${_ok?'rgba(0,200,150,.3)':'var(--border)'};color:${_ok?'var(--green)':'var(--text-muted)'};font-weight:600;cursor:${_ok?'pointer':'not-allowed'};font-size:12px;">✅ Aprovar</button>
+              `:''}
+            </div>
+          </details>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── PAINEL GERENCIAL (ranking por responsável + obrigações) ─────────────────────────────────
+function contRenderGerencial(){
+  const _u=(typeof usuarioLogado!=='undefined'&&usuarioLogado?usuarioLogado.usuario:'').toUpperCase();
+  const _ehGestor=(typeof usuarioLogado!=='undefined'&&usuarioLogado&&usuarioLogado.total)||_u==='DIOGO'||_u==='MASTER'||_u==='MARILIA'||_u==='NICOLAS';
+  if(!_ehGestor){ mostrarToast('🔒 Acesso restrito à gestão'); return; }
+  const hoje=new Date(), ano=hoje.getFullYear(), mes=hoje.getMonth()+1;
+  const porResp={}; // { nome: {empresas, apuradas} }
+  contBuildClientes().filter(c=>!c.pendente&&!c.semContabil).forEach(c=>{
+    const resp=c.responsavel||'Sem resp.';
+    if(!porResp[resp]) porResp[resp]={empresas:0,apuradas:0};
+    porResp[resp].empresas++;
+    if(contClassificarEmpresa(c.cnpj,ano,mes)==='finalizado') porResp[resp].apuradas++;
+  });
+
+  const kEl=document.getElementById('contabil-gerencial-kpis');
+  if(kEl){
+    const tot=Object.values(porResp).reduce((s,d)=>s+d.empresas,0);
+    const apur=Object.values(porResp).reduce((s,d)=>s+d.apuradas,0);
+    kEl.innerHTML=[
+      {l:'Total Empresas', v:tot, s:'no mês', cor:'var(--cyan)'},
+      {l:'Finalizadas', v:apur, s:'de '+tot, cor:'var(--green)'},
+      {l:'Ainda em Andamento', v:tot-apur, s:'apurando ou em conferência', cor:'var(--yellow)'},
+    ].map(k=>`
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">${k.l}</div>
+        <div style="font-size:26px;font-weight:800;color:${k.cor};">${k.v}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${k.s}</div>
+      </div>`).join('');
+  }
+
+  const rEl=document.getElementById('contabil-ranking');
+  if(rEl){
+    const lista=Object.entries(porResp).sort((a,b)=>b[1].apuradas-a[1].apuradas);
+    if(!lista.length){
+      rEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px;">Nenhuma empresa configurada no Contábil ainda.</div>`;
+    } else {
+      rEl.innerHTML=`
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead>
+            <tr style="background:var(--bg-sidebar);">
+              <th style="padding:9px 12px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Responsável</th>
+              <th style="padding:9px 8px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Empresas</th>
+              <th style="padding:9px 8px;text-align:center;font-size:11px;color:var(--green);font-weight:600;border-bottom:1px solid var(--border);">✅ Finalizadas</th>
+              <th style="padding:9px 8px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">% Concluído</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lista.map(([r,d],i)=>{
+              const pct=d.empresas>0?Math.round(d.apuradas/d.empresas*100):0;
+              const cor=pct>=80?'var(--green)':pct>=50?'var(--yellow)':'var(--red)';
+              const medalha=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+              return `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:10px 12px;font-weight:600;">${medalha} ${r}</td>
+                <td style="padding:10px 8px;text-align:center;color:var(--cyan);">${d.empresas}</td>
+                <td style="padding:10px 8px;text-align:center;color:var(--green);font-weight:700;">${d.apuradas}</td>
+                <td style="padding:10px 8px;text-align:center;"><span style="font-weight:700;color:${cor};">${pct}%</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+  }
+
+  // Painel de Obrigações — cada checklist (já dividido item a item) é 1 "obrigação"; conta quantas
+  // empresas a têm configurada, quantas já finalizaram e quantas ainda estão pendentes no mês.
+  const obEl=document.getElementById('contabil-obrigacoes-painel');
+  if(obEl){
+    const resumoOb={}; // { checklistId: {nome, total, entregue, pendente} }
+    contBuildClientes().filter(c=>!c.pendente&&!c.semContabil).forEach(c=>{
+      contChecklistsDaEmpresa(c.cnpj).forEach(chk=>{
+        const st=contStatusChecklist(c.cnpj,chk.id,ano,mes);
+        if(st==='na') return;
+        if(!resumoOb[chk.id]) resumoOb[chk.id]={nome:chk.nome,total:0,entregue:0,pendente:0};
+        resumoOb[chk.id].total++;
+        if(st==='finalizado') resumoOb[chk.id].entregue++;
+        else resumoOb[chk.id].pendente++;
+      });
+    });
+    const linhas=Object.entries(resumoOb).filter(([,d])=>d.total>0).sort((a,b)=>a[1].nome.localeCompare(b[1].nome,'pt-BR'));
+    if(!linhas.length){
+      obEl.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px;">Nenhuma obrigação encontrada para o mês selecionado.</div>';
+    } else {
+      obEl.innerHTML=`
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--bg-sidebar);">
+              <th style="padding:9px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Obrigação</th>
+              <th style="padding:9px 12px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Total</th>
+              <th style="padding:9px 12px;text-align:center;font-size:11px;color:var(--green);font-weight:600;border-bottom:1px solid var(--border);">✅ Entregues</th>
+              <th style="padding:9px 12px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">⏳ Pendentes</th>
+              <th style="padding:9px 12px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Progresso</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhas.map(([,d])=>{
+              const pct=d.total>0?Math.round(d.entregue/d.total*100):0;
+              const cor=pct===100?'var(--green)':pct>=60?'var(--yellow)':'var(--red)';
+              return `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:10px 14px;font-weight:600;color:var(--cyan);">📋 ${d.nome}</td>
+                <td style="padding:10px 12px;text-align:center;color:var(--cyan);font-weight:700;">${d.total}</td>
+                <td style="padding:10px 12px;text-align:center;color:var(--green);font-weight:700;">${d.entregue}</td>
+                <td style="padding:10px 12px;text-align:center;color:var(--text-muted);font-weight:700;">${d.pendente}</td>
+                <td style="padding:10px 14px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                      <div style="width:${pct}%;height:100%;background:${cor};border-radius:3px;"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:700;color:${cor};min-width:32px;">${pct}%</span>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+  }
+
+  // ── Obrigações Acessórias — painel + ranking SEPARADOS do resto (igual ao Fiscal: uma categoria
+  // à parte, nunca somada com os checklists da rotina mensal) ──
+  const obAcEl=document.getElementById('contabil-obrigacoes-acess-painel');
+  if(obAcEl){
+    const resumoAc={}; // { acessId: {total, entregue, pendente} }
+    contBuildClientes().filter(c=>!c.pendente&&!c.semContabil).forEach(c=>{
+      contAcessoriasDaEmpresa(c.cnpj).forEach(id=>{
+        const st=contStatusAcessoria(c.cnpj,id,ano,mes);
+        if(!resumoAc[id]) resumoAc[id]={total:0,entregue:0,pendente:0};
+        resumoAc[id].total++;
+        if(st==='finalizado') resumoAc[id].entregue++;
+        else resumoAc[id].pendente++;
+      });
+    });
+    const linhasAc=CONT_ACESSORIAS.filter(id=>resumoAc[id]&&resumoAc[id].total>0);
+    if(!linhasAc.length){
+      obAcEl.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px;">Nenhuma empresa com obrigação acessória configurada ainda.</div>';
+    } else {
+      obAcEl.innerHTML=`
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--bg-sidebar);">
+              <th style="padding:9px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Obrigação</th>
+              <th style="padding:9px 12px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Total</th>
+              <th style="padding:9px 12px;text-align:center;font-size:11px;color:var(--green);font-weight:600;border-bottom:1px solid var(--border);">✅ Entregues</th>
+              <th style="padding:9px 12px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">⏳ Pendentes</th>
+              <th style="padding:9px 12px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Progresso</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhasAc.map(id=>{
+              const d=resumoAc[id];
+              const pct=d.total>0?Math.round(d.entregue/d.total*100):0;
+              const cor=pct===100?'var(--green)':pct>=60?'var(--yellow)':'var(--red)';
+              return `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:10px 14px;font-weight:600;color:var(--cyan);">🗂️ ${CONT_ACESSORIAS_LABEL[id]}</td>
+                <td style="padding:10px 12px;text-align:center;color:var(--cyan);font-weight:700;">${d.total}</td>
+                <td style="padding:10px 12px;text-align:center;color:var(--green);font-weight:700;">${d.entregue}</td>
+                <td style="padding:10px 12px;text-align:center;color:var(--text-muted);font-weight:700;">${d.pendente}</td>
+                <td style="padding:10px 14px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                      <div style="width:${pct}%;height:100%;background:${cor};border-radius:3px;"></div>
+                    </div>
+                    <span style="font-size:11px;font-weight:700;color:${cor};min-width:32px;">${pct}%</span>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+  }
+
+  const rAcEl=document.getElementById('contabil-ranking-acess');
+  if(rAcEl){
+    const porRespAc={};
+    contBuildClientes().filter(c=>!c.pendente&&!c.semContabil).forEach(c=>{
+      const acs=contAcessoriasDaEmpresa(c.cnpj);
+      if(!acs.length) return; // empresa sem nenhuma acessória configurada nem entra nesta tabela
+      const resp=c.responsavel||'Sem resp.';
+      if(!porRespAc[resp]) porRespAc[resp]={empresas:0,apuradas:0};
+      porRespAc[resp].empresas++;
+      if(contClassificarEmpresaAcess(c.cnpj,ano,mes)==='finalizado') porRespAc[resp].apuradas++;
+    });
+    const listaAc=Object.entries(porRespAc).sort((a,b)=>b[1].apuradas-a[1].apuradas);
+    if(!listaAc.length){
+      rAcEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px;">Nenhuma empresa com obrigação acessória configurada ainda.</div>`;
+    } else {
+      rAcEl.innerHTML=`
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead>
+            <tr style="background:var(--bg-sidebar);">
+              <th style="padding:9px 12px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Responsável</th>
+              <th style="padding:9px 8px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">Empresas</th>
+              <th style="padding:9px 8px;text-align:center;font-size:11px;color:var(--green);font-weight:600;border-bottom:1px solid var(--border);">✅ Finalizadas</th>
+              <th style="padding:9px 8px;text-align:center;font-size:11px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);">% Concluído</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${listaAc.map(([r,d],i)=>{
+              const pct=d.empresas>0?Math.round(d.apuradas/d.empresas*100):0;
+              const cor=pct>=80?'var(--green)':pct>=50?'var(--yellow)':'var(--red)';
+              const medalha=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+              return `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:10px 12px;font-weight:600;">${medalha} ${r}</td>
+                <td style="padding:10px 8px;text-align:center;color:var(--cyan);">${d.empresas}</td>
+                <td style="padding:10px 8px;text-align:center;color:var(--green);font-weight:700;">${d.apuradas}</td>
+                <td style="padding:10px 8px;text-align:center;"><span style="font-weight:700;color:${cor};">${pct}%</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+  }
+}
+
+function contAbrirApuracaoMes(cnpj, ano, mes){
+  const c=contBuildClientes().find(x=>fopNormCnpj(x.cnpj)===fopNormCnpj(cnpj));
+  if(!c) return;
+  document.getElementById('contap-cnpj').value=cnpj;
+  document.getElementById('contap-ano').value=ano;
+  document.getElementById('contap-mes').value=mes;
+  document.getElementById('contap-titulo').textContent=c.nome;
+  document.getElementById('contap-mes-label').textContent=CONT_MES_NOME[mes]+'/'+ano;
+  contRenderApuracaoItens();
+  document.getElementById('modal-cont-apuracao').classList.add('open');
+}
+
+function contRenderApuracaoItens(){
+  const cnpj=document.getElementById('contap-cnpj').value;
+  const ano=Number(document.getElementById('contap-ano').value);
+  const mes=Number(document.getElementById('contap-mes').value);
+  const checklists=contChecklistsDaEmpresa(cnpj);
+  const el=document.getElementById('contap-itens');
+  const aviso=document.getElementById('contap-vazio-aviso');
+  if(!el) return;
+  if(!checklists.length){
+    el.innerHTML='';
+    if(aviso) aviso.textContent='Essa empresa ainda não tem nenhum checklist selecionado — vá em "⚙️ Configurar" e escolha quais checklists ela usa.';
+  } else {
+    if(aviso) aviso.textContent='';
+    el.innerHTML=checklists.map(chk=>contRenderApuracaoChecklistCard(cnpj,ano,mes,chk)).join('');
+    checklists.forEach(chk=>contTempoIniciarRelogioVisual(cnpj,chk.id,ano,mes));
+  }
+  contRenderApuracaoAcess(cnpj,ano,mes);
+}
+
+// Bloco "🗂️ Obrigações Acessórias" dentro do mesmo modal de apuração mensal — separado da rotina
+// (checklists) acima, igual ao Fiscal. Cada uma só tem 2 botões (Enviado / Sem Movimento); marcar
+// qualquer um já finaliza — não passa por cronômetro nem por Conferência.
+function contRenderApuracaoAcess(cnpj, ano, mes){
+  const el=document.getElementById('contap-acess');
+  if(!el) return;
+  const acess=contAcessoriasDaEmpresa(cnpj);
+  if(!acess.length){ el.innerHTML=''; return; }
+  el.innerHTML=`<div style="margin-top:6px;padding-top:14px;border-top:1px solid var(--border);">
+    <div style="font-size:11.5px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">🗂️ Obrigações Acessórias</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      ${acess.map(id=>{
+        const d=contGetApurAcess(cnpj,id,ano,mes);
+        const _env=d.marcado==='enviado', _sm=d.marcado==='sem_movimento';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);">
+          <span style="font-size:12.5px;color:var(--text-primary);flex:1;">${CONT_ACESSORIAS_LABEL[id]}</span>
+          <button onclick="contMarcarAcessoria('${cnpj}','${id}',${ano},${mes},'enviado')" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:${_env?'rgba(0,200,150,.15)':'var(--bg-card-hover)'};border:1px solid ${_env?'rgba(0,200,150,.35)':'var(--border)'};color:${_env?'var(--green)':'var(--text-muted)'};">${_env?'✅':'⬜'} Enviado</button>
+          <button onclick="contMarcarAcessoria('${cnpj}','${id}',${ano},${mes},'sem_movimento')" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:${_sm?'rgba(0,170,221,.15)':'var(--bg-card-hover)'};border:1px solid ${_sm?'rgba(0,170,221,.35)':'var(--border)'};color:${_sm?'var(--cyan)':'var(--text-muted)'};">${_sm?'⚪':'⬜'} Sem Movimento</button>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+function contRenderApuracaoChecklistCard(cnpj, ano, mes, chk){
+  const leaves=contChecklistLeaves(chk);
+  const d=contGetApur(cnpj,chk.id,ano,mes);
+  while(d.checklist.length<leaves.length) d.checklist.push(false);
+  const feitos=d.checklist.filter(Boolean).length;
+  const _finalizado=d.status==='finalizado';
+  const _tempoAtivo=contTempoAtivo(cnpj,chk.id,ano,mes);
+  const _cronOk=!_finalizado&&!!_tempoAtivo&&!_tempoAtivo.pausado;
+
+  let cronHtml;
+  if(_finalizado){
+    cronHtml=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 12px;border-radius:8px;background:rgba(0,200,150,.08);border:1px solid rgba(0,200,150,.3);">
+      <span style="font-size:16px;">✅</span>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:700;color:var(--green);">Conferido e finalizado</div>
+        <div style="font-size:11px;color:var(--text-muted);">${d.confBy?'Por '+d.confBy:''}${d.tsFim?' · '+new Date(d.tsFim).toLocaleDateString('pt-BR'):''}</div>
+      </div>
+    </div>`;
+  } else if(_tempoAtivo&&_tempoAtivo.pausado){
+    const _motivo=(_tempoAtivo.pausas||[]).slice(-1)[0]?.motivo||'—';
+    cronHtml=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 12px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);">
+      <span style="font-size:16px;">⏸</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;color:var(--text-muted);">Pausado — ${_motivo}</div>
+        <div style="font-size:15px;font-weight:700;color:#fbbf24;font-variant-numeric:tabular-nums;">${fopFormatarRelogio(fopTempoElapsedMs(_tempoAtivo))}</div>
+      </div>
+      <button onclick="contTempoRetomar('${cnpj}','${chk.id}',${ano},${mes})" style="padding:8px 12px;border-radius:8px;background:rgba(0,200,150,.15);border:1px solid rgba(0,200,150,.3);color:var(--green);font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">▶ Retomar</button>
+      <button onclick="contConcluirTempo('${cnpj}','${chk.id}',${ano},${mes})" style="padding:8px 12px;border-radius:8px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--red);font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">⏹ Concluir</button>
+    </div>`;
+  } else if(_tempoAtivo){
+    cronHtml=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 12px;border-radius:8px;background:rgba(0,200,150,.08);border:1px solid rgba(0,200,150,.25);">
+      <span style="font-size:16px;">⏱</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;color:var(--text-muted);">Rodando desde ${new Date(_tempoAtivo.inicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+        <div id="cont-tempo-live-${chk.id}" style="font-size:15px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;">${fopFormatarRelogio(fopTempoElapsedMs(_tempoAtivo))}</div>
+      </div>
+      <button onclick="contTempoAbrirPausa('${cnpj}','${chk.id}',${ano},${mes})" style="padding:8px 10px;border-radius:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#fbbf24;font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">⏸ Pausar</button>
+      <button onclick="contConcluirTempo('${cnpj}','${chk.id}',${ano},${mes})" style="padding:8px 12px;border-radius:8px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--red);font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">⏹ Concluir</button>
+    </div>`;
+  } else {
+    const _ultimoReg=contTempos.registros.filter(r=>fopNormCnpj(r.cnpj)===fopNormCnpj(cnpj)&&r.checklistId===chk.id).sort((a,b)=>b.fim-a.fim)[0];
+    cronHtml=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 12px;border-radius:8px;background:var(--bg-card-hover);">
+      <span style="font-size:16px;">⏱</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;color:var(--text-muted);">Obrigatório iniciar o cronômetro antes de marcar o checklist</div>
+        ${_ultimoReg?`<div style="font-size:11px;color:var(--text-muted);">Última vez: ${fopFormatarDuracao(_ultimoReg.minutos*60000)} (${_ultimoReg.colaborador})</div>`:''}
+      </div>
+      <button onclick="contIniciarTempo('${cnpj}','${chk.id}',${ano},${mes})" style="padding:8px 12px;border-radius:8px;background:rgba(0,200,150,.15);border:1px solid rgba(0,200,150,.3);color:var(--green);font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">▶ Iniciar</button>
+    </div>`;
+  }
+
+  let ultimoGrupo;
+  const linhas=leaves.map((leaf,i)=>{
+    const done=!!d.checklist[i];
+    let cabecalho='';
+    if(leaf.grupo!==ultimoGrupo){
+      ultimoGrupo=leaf.grupo;
+      if(leaf.grupo) cabecalho=`<div style="font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin:6px 0 -2px;">${leaf.grupo}</div>`;
+    }
+    return cabecalho+`<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);cursor:${_cronOk?'pointer':'not-allowed'};${leaf.grupo?'margin-left:16px;':''}${done?'opacity:.6;':(!_cronOk?'opacity:.5;':'')}">
+      <input type="checkbox" ${done?'checked':''} ${_cronOk?'':'disabled'} onchange="contToggleApuracaoItem('${cnpj}','${chk.id}',${ano},${mes},${i},this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:${_cronOk?'pointer':'not-allowed'};flex-shrink:0;">
+      <span style="font-size:13px;color:var(--text-primary);${done?'text-decoration:line-through;':''}">${leaf.label}</span>
+    </label>`;
+  }).join('');
+
+  return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
+    <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px;">${chk.nome}</div>
+    ${cronHtml}
+    ${leaves.length?`<div style="display:flex;flex-direction:column;gap:8px;">
+      ${!_cronOk&&!_finalizado?`<div style="font-size:11px;color:var(--yellow);margin-bottom:2px;">🔒 ${_tempoAtivo?'Cronômetro pausado — clique em "▶ Retomar" acima':'Inicie o cronômetro acima antes de marcar o checklist'}</div>`:''}
+      ${linhas}
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">${feitos}/${leaves.length} concluído(s)</div>`:`<div style="text-align:center;padding:10px;color:var(--text-muted);font-size:12px;">Este checklist ainda não tem itens — vá na aba "✅ Checklist" pra adicionar.</div>`}
+  </div>`;
+}
+
+function contToggleApuracaoItem(cnpj, checklistId, ano, mes, idx, checked){
+  const d=contGetApur(cnpj,checklistId,ano,mes);
+  if(d.status==='finalizado'){ mostrarToast('🔒 Esse checklist já foi conferido e finalizado neste mês'); contRenderApuracaoItens(); return; }
+  const _cronOk=(()=>{ const a=contTempoAtivo(cnpj,checklistId,ano,mes); return !!a&&!a.pausado; })();
+  if(!_cronOk){ mostrarToast('🔒 Inicie o cronômetro desse checklist antes de marcar os itens'); contRenderApuracaoItens(); return; }
+  d.checklist[idx]=checked;
+  fopSalvar();
+  contRenderApuracaoItens();
+  contRenderTable();
+}
+
+// ── CRONÔMETRO DO CONTÁBIL (igual ao fopTempos do Fiscal — ver fopIniciarTempo/fopTempoPausar/
+// fopConcluirTempo mais abaixo; reaproveita fopFormatarDuracao/fopFormatarRelogio/FOP_TEMPO_MOTIVOS_PAUSA
+// que já são genéricos. A diferença é a chave: aqui é por empresa+checklist+mês, não por imposto.
+// Por enquanto (1ª versão) não repete o aviso "ainda está trabalhando?" por inatividade do Fiscal —
+// só o play/pausa/concluir e o tempo total gasto ficam registrados; dá pra adicionar depois.) ──
+function contTempoChave(cnpj, checklistId, ano, mes){
+  return contNormCnpj(cnpj)+'|'+checklistId+'|'+ano+'_'+String(mes).padStart(2,'0')+'|'+((typeof usuarioLogado!=='undefined'&&usuarioLogado&&usuarioLogado.usuario)||'');
+}
+function contTempoAtivo(cnpj, checklistId, ano, mes){
+  return contTempos.ativos[contTempoChave(cnpj,checklistId,ano,mes)]||null;
+}
+function contIniciarTempo(cnpj, checklistId, ano, mes){
+  const empresa=contBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
+  const chk=contChkPorId(checklistId);
+  if(!empresa||!chk) return;
+  const chave=contTempoChave(cnpj,checklistId,ano,mes);
+  contTempos.ativos[chave]={
+    cnpj:fopNormCnpj(cnpj), checklistId, ano, mes,
+    usuario:(typeof usuarioLogado!=='undefined'&&usuarioLogado&&usuarioLogado.usuario)||'',
+    colaborador:fopGetUsuario(), empresa:empresa.nome, checklistNome:chk.nome,
+    inicio:Date.now(), segmentoInicio:Date.now(), acumuladoMs:0,
+    pausado:false, pausas:[],
+  };
+  fopSalvar();
+  mostrarToast('▶ Cronômetro iniciado — '+chk.nome);
+  contRenderApuracaoItens();
+}
+function contTempoAbrirPausa(cnpj, checklistId, ano, mes){
+  const ativo=contTempoAtivo(cnpj,checklistId,ano,mes);
+  if(!ativo||ativo.pausado) return;
+  let m=document.getElementById('modal-cont-tempo-pausa');
+  if(!m){ m=document.createElement('div'); m.id='modal-cont-tempo-pausa'; m.className='modal-overlay'; document.body.appendChild(m); }
+  const opcoes=FOP_TEMPO_MOTIVOS_PAUSA.map(mo=>
+    `<button onclick="contTempoPausar('${cnpj}','${checklistId}',${ano},${mes},'${mo}')" style="width:100%;text-align:left;padding:10px 14px;border-radius:8px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);font-size:13px;cursor:pointer;margin-bottom:6px;">${mo}</button>`
+  ).join('');
+  m.innerHTML=`<div class="modal" style="max-width:380px;width:90%;">
+    <div class="modal-header">
+      <div class="modal-title">⏸ Pausar cronômetro</div>
+      <button class="modal-close" onclick="document.getElementById('modal-cont-tempo-pausa').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Por que está pausando? (obrigatório)</p>
+      ${opcoes}
+    </div>
+  </div>`;
+  m.classList.add('open');
+}
+function contTempoPausar(cnpj, checklistId, ano, mes, motivo){
+  if(!FOP_TEMPO_MOTIVOS_PAUSA.includes(motivo)) return;
+  const chave=contTempoChave(cnpj,checklistId,ano,mes);
+  const ativo=contTempos.ativos[chave];
+  if(!ativo||ativo.pausado) return;
+  ativo.acumuladoMs=(ativo.acumuladoMs||0)+(Date.now()-(ativo.segmentoInicio||ativo.inicio));
+  ativo.segmentoInicio=null;
+  ativo.pausado=true;
+  if(!ativo.pausas) ativo.pausas=[];
+  ativo.pausas.push({motivo, pausadoEm:Date.now(), retomadoEm:null});
+  fopSalvar();
+  document.getElementById('modal-cont-tempo-pausa')?.classList.remove('open');
+  mostrarToast('⏸ Cronômetro pausado — '+motivo);
+  contRenderApuracaoItens();
+}
+function contTempoRetomar(cnpj, checklistId, ano, mes){
+  const chave=contTempoChave(cnpj,checklistId,ano,mes);
+  const ativo=contTempos.ativos[chave];
+  if(!ativo||!ativo.pausado) return;
+  ativo.segmentoInicio=Date.now();
+  ativo.pausado=false;
+  const ultimaPausa=(ativo.pausas||[]).slice(-1)[0];
+  if(ultimaPausa&&!ultimaPausa.retomadoEm) ultimaPausa.retomadoEm=Date.now();
+  fopSalvar();
+  mostrarToast('▶ Cronômetro retomado');
+  contRenderApuracaoItens();
+}
+function contConcluirTempo(cnpj, checklistId, ano, mes, motivo){
+  const chave=contTempoChave(cnpj,checklistId,ano,mes);
+  const ativo=contTempos.ativos[chave];
+  if(!ativo) return;
+  const d=contGetApur(cnpj,checklistId,ano,mes);
+  const checklistCompleto=d.checklist.length>0 && d.checklist.every(v=>v);
+  if(!checklistCompleto){
+    const ok=confirm('O checklist ainda não está totalmente marcado. Tem certeza que quer concluir mesmo assim?');
+    if(!ok) return;
+  }
+  const elapsed=fopTempoElapsedMs(ativo);
+  delete contTempos.ativos[chave];
+  const fim=Date.now();
+  const segundos=Math.max(1,Math.round(elapsed/1000));
+  const minutos=Math.max(1,Math.round(elapsed/60000));
+  contTempos.registros.push({
+    ...ativo, fim, segundos, minutos, motivoFim:motivo||'concluido',
+  });
+  fopSalvar();
+  mostrarToast(`⏱ Tempo registrado: ${fopFormatarDuracao(elapsed)}`);
+  contRenderApuracaoItens();
+}
+// Relógio visual ao vivo (mesma ideia do fopTempoIniciarRelogioVisual): atualiza o número a cada
+// segundo enquanto o modal de apuração estiver aberto. Aqui precisa de um MAPA de intervalId (em
+// vez de uma variável só, como no Fiscal) porque podem existir vários cronômetros rodando ao
+// mesmo tempo dentro do mesmo modal — um por checklist daquela empresa.
+let contTempoRelogioIds={};
+function contTempoIniciarRelogioVisual(cnpj, checklistId, ano, mes){
+  if(contTempoRelogioIds[checklistId]){ clearInterval(contTempoRelogioIds[checklistId]); delete contTempoRelogioIds[checklistId]; }
+  const _ativoInicial=contTempoAtivo(cnpj,checklistId,ano,mes);
+  if(!_ativoInicial||_ativoInicial.pausado) return;
+  const tick=()=>{
+    const el=document.getElementById('cont-tempo-live-'+checklistId);
+    const modalAberto=document.getElementById('modal-cont-apuracao')?.classList.contains('open');
+    const ativo=contTempoAtivo(cnpj,checklistId,ano,mes);
+    if(!el||!modalAberto||!ativo||ativo.pausado){ if(contTempoRelogioIds[checklistId]){ clearInterval(contTempoRelogioIds[checklistId]); delete contTempoRelogioIds[checklistId]; } return; }
+    el.textContent=fopFormatarRelogio(fopTempoElapsedMs(ativo));
+  };
+  tick();
+  contTempoRelogioIds[checklistId]=setInterval(tick, 1000);
+}
+
 function fopGerarTarefasPendentes(){
   const pendentes=fopBuildClientes().filter(c=>c.pendente);
   let criou=false;
@@ -9800,35 +11385,60 @@ async function fopAbrirConfigFiscal(cnpj){
   if(!chkLista.length) await chkCarregar();
   const c=(typeof opClientes!=='undefined'?opClientes:[]).find(x=>fopNormCnpj(x.cnpj)===fopNormCnpj(cnpj));
   if(!c){mostrarToast('Cliente não encontrado');return;}
-  const IMPS_CONFIG=['icms','fundos','ipi','pis_cofins','iss','retidos','irpj_csll','pgdas','das_mei'];
   const modal=document.getElementById('modal-config-fiscal');
   if(!modal) return;
   document.getElementById('mcf-titulo').textContent=c.nome;
   document.getElementById('mcf-cnpj').value=cnpj;
-    const kExist=fopNormCnpj(cnpj);
+  const kExist=fopNormCnpj(cnpj);
   const cfgExist=(fopFiscalConfigs[kExist]&&!fopFiscalConfigs[kExist].resetado)?fopFiscalConfigs[kExist]:null;
   document.getElementById('mcf-sem-fiscal').checked=cfgExist?!!cfgExist.semFiscal:false;
   fopPopularSelectMcfResp(cfgExist?(cfgExist.respMes||''):'');
   document.getElementById('mcf-ie').value=cfgExist?cfgExist.inscEst:(c.ie||'');
   document.getElementById('mcf-partic').value=cfgExist?cfgExist.particularidades:'';
-  // Montar grid com checklists do Supabase
+  // Grid de "Obrigações Fiscais Ativas" — antes só olhava pros checklists da biblioteca (e nunca
+  // ligava de volta pro que a empresa realmente tem, então dava pra marcar/desmarcar aqui sem
+  // efeito nenhum). Agora mostra as 9 obrigações de verdade (fopGetImpostos) e já vem marcado com
+  // o que a empresa tem HOJE (configuração salva, ou — se nunca foi configurada — o cálculo
+  // automático por regime), pra dar pra tirar ou incluir uma obrigação específica dela.
+  const empresaAtual=fopBuildClientes().find(x=>fopNormCnpj(x.cnpj)===kExist)||c;
+  const impostosAtuais=cfgExist&&Array.isArray(cfgExist.impostos)?cfgExist.impostos:fopGetImpostos(empresaAtual);
   const grid=document.getElementById('mcf-impostos-grid');
-  const chksSel=cfgExist&&cfgExist.checklists?cfgExist.checklists:[];
-  if(chkLista.length){
-    grid.innerHTML=chkLista.map(chk=>`
-      <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:var(--bg-card-hover);border:1px solid var(--border);cursor:pointer;">
-        <input type="checkbox" name="mcf-chk" value="${chk.id}" ${chksSel.includes(chk.id)?"checked":""}
-          style="width:16px;height:16px;accent-color:var(--cyan);cursor:pointer;">
-        <div>
-          <div style="font-size:12px;font-weight:700;color:var(--text-primary);">${chk.nome}</div>
-          <div style="font-size:10px;color:var(--text-muted);">${(chk.itens||[]).length} itens</div>
-        </div>
-      </label>`).join('');
-  } else {
-    grid.innerHTML=`<div style="color:var(--text-muted);font-size:12px;padding:8px;grid-column:1/-1;">Nenhum checklist cadastrado ainda. Vá em <b>Checklist</b> no menu para criar.</div>`;
+  if(grid){
+    // Ícone só de apoio visual (facilita bater o olho e achar a obrigação certa na grade) — não
+    // tem nenhum efeito funcional, é puramente estético (pedido do Diogo: "deixar mais bonita").
+    const _icone={icms:'📦',fundos:'🏛️',ipi:'🏭',pis_cofins:'💰',iss:'🏙️',retidos:'🔒',irpj_csll:'📊',pgdas:'🧮',das_mei:'🧑‍💼'};
+    grid.innerHTML=FOP_IMPS_CONFIG.map(imp=>{
+      const marcado=impostosAtuais.includes(imp);
+      return `
+      <label class="mcf-imp-card" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:background .15s,border-color .15s;
+        background:${marcado?"rgba(0,170,221,.12)":"var(--bg-card-hover)"};border:1px solid ${marcado?"var(--cyan)":"var(--border)"};">
+        <div style="font-size:15px;flex-shrink:0;">${_icone[imp]||'📄'}</div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--text-primary);flex:1;">${FOP_LABELS[imp]||imp}</div>
+        <input type="checkbox" name="mcf-imp" value="${imp}" ${marcado?"checked":""} onchange="fopMcfImpVisual(this)"
+          style="width:17px;height:17px;flex-shrink:0;accent-color:var(--cyan);cursor:pointer;">
+      </label>`;
+    }).join('');
   }
+  fopAtualizarContadorImpostos();
   fopToggleSemFiscal(document.getElementById('mcf-sem-fiscal').checked);
   modal.classList.add('open');
+}
+
+// Feedback visual do card ao marcar/desmarcar uma obrigação em "⚙️ Configurar Fiscal" (puramente
+// estético) + atualiza o contador "X selecionadas" no cabeçalho da seção.
+function fopMcfImpVisual(cb){
+  const card=cb.closest('label');
+  if(card){
+    card.style.background=cb.checked?'rgba(0,170,221,.12)':'var(--bg-card-hover)';
+    card.style.borderColor=cb.checked?'var(--cyan)':'var(--border)';
+  }
+  fopAtualizarContadorImpostos();
+}
+function fopAtualizarContadorImpostos(){
+  const el=document.getElementById('mcf-impostos-count');
+  if(!el) return;
+  const n=document.querySelectorAll('#mcf-impostos-grid input[name=mcf-imp]:checked').length;
+  el.textContent=n===1?'1 selecionada':n+' selecionadas';
 }
 
 function fopToggleSemFiscal(val){
@@ -9912,14 +11522,11 @@ function fopSalvarConfigFiscal(){
   const c=(typeof opClientes!=='undefined'?opClientes:[]).find(x=>fopNormCnpj(x.cnpj)===fopNormCnpj(cnpj));
   if(!c){mostrarToast('Erro: cliente não encontrado');return;}
 
-  const chksSelecionados=[];
+  const impostosSelecionados=[];
   if(!semFiscal){
-    document.querySelectorAll('#mcf-impostos-grid input[name=mcf-chk]:checked').forEach(cb=>chksSelecionados.push(cb.value));
-    if(!chksSelecionados.length){mostrarToast('⚠️ Selecione ao menos um checklist ou marque "Sem operação fiscal"');return;}
+    document.querySelectorAll('#mcf-impostos-grid input[name=mcf-imp]:checked').forEach(cb=>impostosSelecionados.push(cb.value));
+    if(!impostosSelecionados.length){mostrarToast('⚠️ Selecione ao menos uma obrigação ou marque "Sem operação fiscal"');return;}
   }
-
-  // obrigs vazio (checklists substituem impostos individuais)
-  const obrigs={};
 
   const config={
     cod: c.cod,
@@ -9935,9 +11542,12 @@ function fopSalvarConfigFiscal(){
     cronograma: '',
     respMes: resp,
     particularidades: partic,
-    obrigs: obrigs,
+    obrigs: {},
     semFiscal: semFiscal,
-    checklists: chksSelecionados,
+    // Lista explícita das obrigações desta empresa (fopGetImpostos passa a usar isto em vez do
+    // cálculo automático por regime) — é o que permite tirar/incluir uma obrigação específica,
+    // tipo tirar "PIS/COFINS" e "Retidos" de uma empresa que não precisa delas.
+    impostos: semFiscal?[]:impostosSelecionados,
     configPor: (typeof usuarioLogado!=='undefined'&&usuarioLogado?usuarioLogado.usuario:''),
     configEm: new Date().toISOString(),
   };
@@ -10910,12 +12520,10 @@ function fopAbrirModal(cnpj, imposto, fam){
       _fcfg.checklists.includes(chk.id)&&
       chk.nome.toLowerCase().replace(/[\/\s_]+/g,' ').includes(_impoNorm)
     );
-    if(_matchChk){
-      items=[...(_matchChk.itens||[])];
-    } else {
-      mostrarToast('⛔ Checklist não configurado para esta empresa');
-      return;
-    }
+    // Se não achar um checklist customizado pra esse imposto específico, usa o checklist padrão
+    // em vez de bloquear — "Obrigações Fiscais Ativas" (em ⚙️ Configurar) e este checklist
+    // customizado por nome são coisas independentes; uma não deve impedir a outra de abrir.
+    items=_matchChk?[...(_matchChk.itens||[])]:[...(FOP_CHECKLISTS[imposto]||[])];
   } else if(!_temConfigNova){
     items=[...(FOP_CHECKLISTS[imposto]||[])];
   }
@@ -11076,7 +12684,7 @@ function fopAbrirRotinas(cnpj, fam){
 function fopCheckItem(cnpj, imposto, idx, val, fam){
   const _render=()=>{ fopAbrirModal(cnpj,imposto,fam); fam==='acess'?renderFiscalTableAcess():renderFiscalTable(); };
   if(imposto==='conferencia'&&!fopIsConferente()){ mostrarToast('🔒 Acesso restrito'); return; }
-  const empresa=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).find(c=>c.cnpj===cnpj);
+  const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
   const apur=fopGetApur(cnpj, fam);
   if(!apur[imposto]) apur[imposto]={status:'',checklist:[],obs:'',apurador:fopGetUsuario()};
   const d=apur[imposto];
@@ -11197,7 +12805,7 @@ function fopCheckItem(cnpj, imposto, idx, val, fam){
 }
 
 function fopSetStatus(cnpj, imposto, status, anexo, fam){
-  const empresa=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).find(c=>c.cnpj===cnpj);
+  const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
   const apur=fopGetApur(cnpj, fam);
   if(!apur[imposto]) apur[imposto]={status:'',checklist:[],obs:'',apurador:fopGetUsuario()};
   const obsEl=document.getElementById(`fop-obs-${cnpj}-${imposto}`);
@@ -11273,7 +12881,8 @@ function fopAprovar(cnpj, imposto){
   if(!CONF_CHECKLIST.every((_,i)=>((_aChk[imposto]||{}).chkConf||[])[i])){
     mostrarToast('⚠️ Conclua o checklist de conferência antes de aprovar'); return;
   }
-  const empresa=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).find(c=>c.cnpj===cnpj);
+  const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
+  if(!empresa){ mostrarToast('❌ Empresa não encontrada'); return; }
   const apur=fopGetApur(cnpj);
   if(!apur[imposto]) return;
   apur[imposto].status='aprovado';
@@ -11298,7 +12907,7 @@ function fopAprovar(cnpj, imposto){
 
 function fopEnviarCliente(cnpj){
   if(!fopIsConferente()){ mostrarToast('🔒 Apenas conferentes podem enviar ao cliente'); return; }
-  const empresa=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).find(c=>c.cnpj===cnpj);
+  const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
   if(!empresa) return;
   const apur=fopGetApur(cnpj);
   const imps=fopGetImpostos(empresa);
@@ -11359,7 +12968,7 @@ function fopConfirmarCorrecao(){
     fopSetStatus(cnpj,imposto,'correcao',anexo,_fopCorrFam);
     document.getElementById('modal-correcao')?.classList.remove('open');
     document.getElementById('modal-fop')?.classList.remove('open');
-    const empresa=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).find(c=>c.cnpj===cnpj);
+    const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
     mostrarToast('🔴 Correção solicitada — tarefa criada para '+(empresa?.respMes||'responsável'));
   };
   if(file){
@@ -11371,7 +12980,7 @@ function fopConfirmarCorrecao(){
 
 // ── MÓDULO 4: TAREFAS ────────────────────────────────────────────────────────
 function fopAbrirNovaTarefa(){
-  const base=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]);
+  const base=fopBuildClientes().filter(c=>!c.pendente);
   let m=document.getElementById('modal-nova-tarefa');
   if(!m){ m=document.createElement('div'); m.id='modal-nova-tarefa'; m.className='modal-overlay'; document.body.appendChild(m); }
   m.innerHTML=`<div class="modal" style="max-width:480px;width:90%;">
@@ -11400,7 +13009,7 @@ function fopSalvarNovaTarefa(){
   const imposto=document.getElementById('ntf-imposto').value;
   const motivo=(document.getElementById('ntf-motivo').value||'').trim();
   if(!motivo){ alert('Descreva a tarefa.'); return; }
-  const empresa=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).find(c=>c.cnpj===cnpj);
+  const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
   fopTarefas.push({id:Date.now(),cnpj,empresa:empresa?.nome||cnpj,imposto,
     responsavel:empresa?.respMes||'—',status:'a_fazer',motivo,tipo:'manual',
     mesKey:fopGetKey(cnpj),criadoEm:new Date().toISOString(),criadoPor:fopGetUsuario()});
@@ -11420,7 +13029,7 @@ function fiscalTarefasFiltrar(filtro, el){
 function fopRenderTarefas(){
   const SL={a_fazer:'⏳ A Fazer',em_andamento:'🔄 Em Andamento',disponivel:'🔵 Disponível',correcao:'🔴 Correção',concluido:'✅ Concluído'};
   const _tarUserResp=(typeof usuarioLogado!=='undefined'&&usuarioLogado&&usuarioLogado.fiscalResp)||null;
-  fopPopularSelectResp('fop-sel-resp-tar', (typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]));
+  fopPopularSelectResp('fop-sel-resp-tar', fopBuildClientes().filter(c=>!c.pendente));
   let lista=(fopFiltroTarefa==='todos'?fopTarefas:fopTarefas.filter(t=>t.status===fopFiltroTarefa))
     .filter(t=>!_tarUserResp||(t.responsavel||'').toUpperCase().includes(_tarUserResp.toUpperCase()))
     .filter(t=>fopFiltroRespTar==='todos'||t.responsavel===fopFiltroRespTar);
@@ -11508,7 +13117,10 @@ function fopRenderConferencia(){
   }
 
   if(fopFiltroConf==='aprovado'){
-    const base=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]);
+    // fopBuildClientes() (não o FISCAL_CLIENTES_BASE cru) — senão uma empresa com configuração
+    // salva em "⚙️ Configurar" (responsável, obrigações etc.) ficava com dado desatualizado aqui
+    // e podia até desaparecer da lista mesmo contando no card "Em Conferência".
+    const base=fopBuildClientes().filter(c=>!c.pendente);
     const empresas=base.filter(c=>{
       const apur=fopGetApur(c.cnpj);
       return fopGetImpostos(c).some(i=>(apur[i]||{}).status==='aprovado');
@@ -11536,7 +13148,7 @@ function fopRenderConferencia(){
   }
 
   let itens=[];
-  (typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).forEach(c=>{
+  fopBuildClientes().filter(c=>!c.pendente).forEach(c=>{
     const apur=fopGetApur(c.cnpj);
     fopGetImpostos(c).forEach(imp=>{
       const d=apur[imp]||{};
@@ -11634,7 +13246,7 @@ function fopRenderFinalizados(){
     el.innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">🔒 <div style="margin-top:8px;font-size:13px;">Acesso restrito — esta área é exclusiva dos conferentes.</div></div>`;
     return;
   }
-  const base=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]);
+  const base=fopBuildClientes().filter(c=>!c.pendente);
   const empresas=base.filter(c=>{
     const apur=fopGetApur(c.cnpj);
     return fopGetImpostos(c).some(i=>(apur[i]||{}).status==='finalizado');
@@ -11667,7 +13279,7 @@ function fopRenderGerencial(){
 
   const porResp = {}; // { nome: { empresas, apuradas, noPrazo, foraPrazo, ultimoDia, correcoes } }
 
-  (typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).forEach(c=>{
+  fopBuildClientes().filter(c=>!c.pendente).forEach(c=>{
     // Este painel é só de Obrigações do Mês — as Acessórias têm seu próprio painel espelhado logo
     // abaixo (🗂️ Obrigações Acessórias / 👥 Desempenho — Acessórias), pra não misturar os números
     const apur   = fopGetApur(c.cnpj);
@@ -11774,7 +13386,7 @@ function fopRenderGerencial(){
     // Para cada obrigação: contar total, entregues, pendentes, em correção
     const resumoOb = {}; // { imposto: { total, entregue, pendente, correcao } }
 
-    (typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).forEach(c=>{
+    fopBuildClientes().filter(c=>!c.pendente).forEach(c=>{
       const apur = fopGetApur(c.cnpj);
       const imps = fopGetImpostos(c);
       imps.forEach(imp=>{
@@ -11839,7 +13451,7 @@ function fopRenderGerencial(){
   const rAcEl = document.getElementById('fiscal-ranking-acess');
   if(rAcEl){
     const porRespAc = {}; // { nome: { empresas, apuradas, noPrazo, foraPrazo, ultimoDia, correcoes } }
-    (typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).forEach(c=>{
+    fopBuildClientes().filter(c=>!c.pendente).forEach(c=>{
       const apurAc = fopGetApurAcess(c.cnpj);
       const acs    = fopGetAcessorias(c);
       if(!acs.length) return; // empresa sem obrigação acessória nenhuma nem entra na tabela
@@ -11914,7 +13526,7 @@ function fopRenderGerencial(){
   const obAcEl = document.getElementById('fiscal-obrigacoes-acess-painel');
   if(obAcEl){
     const resumoObAc = {}; // { imposto: { total, entregue, pendente, correcao } }
-    (typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).forEach(c=>{
+    fopBuildClientes().filter(c=>!c.pendente).forEach(c=>{
       const apurAc = fopGetApurAcess(c.cnpj);
       fopGetAcessorias(c).forEach(imp=>{
         if(!resumoObAc[imp]) resumoObAc[imp]={ total:0, entregue:0, pendente:0, correcao:0 };
@@ -12000,7 +13612,7 @@ function fopAbrirDetalheObrigacaoAcess(imp){
   const stLabel = { '':'Não iniciado', apurando:'Em Apuração', disponivel:'Disp. Conferência', correcao:'Correção', aprovado:'Aprovado', finalizado:'Finalizado', na:'N/A' };
   const stCor   = { '':'var(--text-muted)', apurando:'var(--yellow)', disponivel:'var(--royal)', correcao:'var(--red)', aprovado:'var(--purple)', finalizado:'var(--green)', na:'var(--text-muted)' };
 
-  const empresas = (typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[])
+  const empresas = fopBuildClientes().filter(c=>!c.pendente)
     .filter(c => fopGetAcessorias(c).includes(imp))
     .map(c => {
       const apurAc = fopGetApurAcess(c.cnpj);
@@ -12563,7 +14175,7 @@ function fopAbrirDetalheObrigacao(imp){
   const stLabel = { '':'Não iniciado', apurando:'Em Apuração', disponivel:'Disp. Conferência', correcao:'Correção', aprovado:'Aprovado', finalizado:'Finalizado', na:'N/A' };
   const stCor   = { '':'var(--text-muted)', apurando:'var(--yellow)', disponivel:'var(--royal)', correcao:'var(--red)', aprovado:'var(--purple)', finalizado:'var(--green)', na:'var(--text-muted)' };
 
-  const empresas = (typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[])
+  const empresas = fopBuildClientes().filter(c=>!c.pendente)
     .filter(c => fopGetImpostos(c).includes(imp))
     .map(c => {
       const apur = fopGetApur(c.cnpj);
@@ -12812,7 +14424,7 @@ function fopRenderHistorico(){
 
 // ── MÓDULO 2: EMPRESAS ───────────────────────────────────────────────────────
 function fopEditarParticularidade(cnpj){
-  const c=(typeof FISCAL_CLIENTES_BASE!=='undefined'?FISCAL_CLIENTES_BASE:[]).find(x=>x.cnpj===cnpj);
+  const c=fopBuildClientes().find(x=>fopNormCnpj(x.cnpj)===fopNormCnpj(cnpj));
   const atual=fopParticOverride[cnpj]!==undefined?fopParticOverride[cnpj]:(c?.particularidades||'');
   const novo=prompt('Particularidade da empresa:',atual);
   if(novo===null) return;
@@ -13048,69 +14660,156 @@ fopCarregar();
 
 <!-- ── MODAL CONFIGURAÇÃO FISCAL ── -->
 <div class="modal-overlay" id="modal-config-fiscal" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal-box" style="max-width:580px;max-height:90vh;overflow-y:auto;">
-    <div class="modal-header">
-      <div>
-        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">Configuração Fiscal</div>
-        <div style="font-size:15px;font-weight:700;color:var(--text-primary);" id="mcf-titulo">—</div>
+  <div class="modal-box" style="max-width:640px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header" style="background:linear-gradient(135deg,rgba(0,170,221,.10),rgba(0,170,221,0) 65%);">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="width:40px;height:40px;flex-shrink:0;border-radius:12px;background:rgba(0,170,221,.15);border:1px solid rgba(0,170,221,.35);display:flex;align-items:center;justify-content:center;font-size:18px;">⚙️</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">Configuração Fiscal</div>
+          <div style="font-size:16px;font-weight:800;color:var(--text-primary);" id="mcf-titulo">—</div>
+        </div>
       </div>
       <button class="modal-close" onclick="document.getElementById('modal-config-fiscal').classList.remove('open')">✕</button>
     </div>
-    <div style="padding:20px;display:flex;flex-direction:column;gap:18px;">
+    <div style="padding:22px;display:flex;flex-direction:column;gap:20px;">
       <input type="hidden" id="mcf-cnpj">
 
       <!-- Sem operação fiscal -->
-      <label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.25);cursor:pointer;">
+      <label style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.25);cursor:pointer;transition:background .15s;">
+        <div style="width:34px;height:34px;flex-shrink:0;border-radius:10px;background:rgba(255,77,106,.15);display:flex;align-items:center;justify-content:center;font-size:15px;">🚫</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:var(--red);">Sem Operação Fiscal</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">Esta empresa não terá nenhuma apuração fiscal — não aparecerá nas filas</div>
+        </div>
         <input type="checkbox" id="mcf-sem-fiscal" onchange="fopToggleSemFiscal(this.checked)"
+          style="width:19px;height:19px;flex-shrink:0;accent-color:var(--red);cursor:pointer;">
+      </label>
+
+      <!-- Responsável + IE -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">👤 Responsável Fiscal</div>
+          <select id="mcf-resp" style="width:100%;padding:10px 12px;border-radius:9px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+            <option value="">— Selecione o analista —</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">🧾 Inscrição Estadual</div>
+          <input type="text" id="mcf-ie" placeholder="IE ou Isento"
+            style="width:100%;padding:10px 12px;border-radius:9px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+        </div>
+      </div>
+
+      <!-- Impostos -->
+      <div id="mcf-impostos-section" style="transition:opacity .15s;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);">
+            Obrigações Fiscais Ativas
+            <span style="font-weight:400;font-size:10px;color:var(--text-muted);text-transform:none;"> — marque apenas as que se aplicam</span>
+          </div>
+          <span id="mcf-impostos-count" style="font-size:10.5px;font-weight:700;color:var(--cyan);background:rgba(0,170,221,.12);border:1px solid rgba(0,170,221,.3);padding:3px 10px;border-radius:999px;white-space:nowrap;">0 selecionadas</span>
+        </div>
+        <div id="mcf-impostos-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:9px;"></div>
+      </div>
+
+      <!-- Particularidades -->
+      <div>
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">📝 Particularidades</div>
+        <textarea id="mcf-partic" rows="3" placeholder="Observações específicas desta empresa..."
+          style="width:100%;padding:10px 12px;border-radius:9px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+      </div>
+
+      <!-- Botões -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--border);margin-top:2px;padding-top:16px;">
+        <button onclick="fopResetarConfigFiscal(document.getElementById('mcf-cnpj').value)"
+          style="padding:10px 18px;border-radius:9px;margin-right:auto;background:transparent;border:1px solid transparent;color:var(--text-muted);font-size:12.5px;cursor:pointer;transition:background .15s,color .15s;"
+          onmouseover="this.style.background='rgba(255,77,106,.1)';this.style.color='var(--red)';" onmouseout="this.style.background='transparent';this.style.color='var(--text-muted)';">
+          🗑️ Resetar configuração
+        </button>
+        <button onclick="document.getElementById('modal-config-fiscal').classList.remove('open')"
+          style="padding:10px 20px;border-radius:9px;background:var(--bg-card-hover);border:1px solid var(--border);color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;">
+          Cancelar
+        </button>
+        <button onclick="fopSalvarConfigFiscal()"
+          style="padding:10px 26px;border-radius:9px;background:linear-gradient(135deg,var(--cyan),#0090c0);border:1px solid rgba(0,170,221,.5);color:#fff;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,170,221,.3);">
+          ✅ Salvar Configuração
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL CONFIGURAÇÃO CONTÁBIL ── -->
+<div class="modal-overlay" id="modal-config-contabil" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" style="max-width:580px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">Configuração Contábil</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-primary);" id="mcc-titulo">—</div>
+      </div>
+      <button class="modal-close" onclick="document.getElementById('modal-config-contabil').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:18px;">
+      <input type="hidden" id="mcc-cnpj">
+
+      <!-- Sem Contábil -->
+      <label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.25);cursor:pointer;">
+        <input type="checkbox" id="mcc-sem-contabil" onchange="contToggleSemContabil(this.checked)"
           style="width:18px;height:18px;accent-color:var(--red);cursor:pointer;">
         <div>
-          <div style="font-size:13px;font-weight:700;color:var(--red);">Sem Operação Fiscal</div>
-          <div style="font-size:11px;color:var(--text-muted);">Esta empresa não terá nenhuma apuração fiscal — não aparecerá nas filas</div>
+          <div style="font-size:13px;font-weight:700;color:var(--red);">Sem Contábil</div>
+          <div style="font-size:11px;color:var(--text-muted);">Esta empresa não usa o serviço Contábil — não aparecerá na lista de Empresas</div>
         </div>
       </label>
 
       <!-- Responsável -->
       <div>
-        <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Responsável Fiscal</div>
-        <select id="mcf-resp" style="width:100%;padding:9px 12px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:13px;">
-          <option value="">— Selecione o analista responsável —</option>
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Responsável</div>
+        <select id="mcc-resp" style="width:100%;padding:9px 12px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:13px;">
+          <option value="">— Selecione o responsável —</option>
         </select>
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:5px;">A lista vem do cadastro de "Colaboradores Contábeis" (👥 acima da tabela de Empresas).</div>
       </div>
 
-      <!-- IE -->
+      <!-- Bancos -->
       <div>
-        <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Inscrição Estadual</div>
-        <input type="text" id="mcf-ie" placeholder="IE ou Isento"
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Bancos</div>
+        <input type="text" id="mcc-bancos" placeholder="Ex: Banco do Brasil, Sicoob, Inter (separe por vírgula)"
           style="width:100%;padding:9px 12px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:13px;box-sizing:border-box;">
       </div>
 
-      <!-- Impostos -->
-      <div id="mcf-impostos-section">
-        <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">
-          Obrigações Fiscais Ativas
-          <span style="font-weight:400;font-size:10px;color:var(--text-muted);text-transform:none;"> — marque apenas as que se aplicam</span>
-        </div>
-        <div id="mcf-impostos-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+      <!-- Checklists desta empresa -->
+      <div id="mcc-checklists-section">
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Checklists desta empresa</div>
+        <div id="mcc-checklists-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:5px;">Marque quais checklists (da aba "✅ Checklist") esta empresa precisa fazer todo mês. Uma empresa pode ter 1, vários ou nenhum.</div>
+      </div>
+
+      <!-- Obrigações Acessórias desta empresa -->
+      <div id="mcc-acessorias-section">
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Obrigações Acessórias desta empresa</div>
+        <div id="mcc-acessorias-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:5px;">Igual ao Fiscal: declarações separadas da rotina mensal (SPED Contábil, ECF etc). Marque quais esta empresa precisa entregar.</div>
       </div>
 
       <!-- Particularidades -->
       <div>
         <div style="font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Particularidades</div>
-        <textarea id="mcf-partic" rows="3" placeholder="Observações específicas desta empresa..."
+        <textarea id="mcc-partic" rows="3" placeholder="Observações específicas desta empresa..."
           style="width:100%;padding:9px 12px;border-radius:8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
       </div>
 
       <!-- Botões -->
       <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;">
-        <button onclick="fopResetarConfigFiscal(document.getElementById('mcf-cnpj').value)"
+        <button onclick="contResetarConfigContabil(document.getElementById('mcc-cnpj').value)"
           style="padding:9px 20px;border-radius:8px;margin-right:auto;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.25);color:var(--red);font-size:13px;cursor:pointer;">
           Resetar
         </button>
-        <button onclick="document.getElementById('modal-config-fiscal').classList.remove('open')"
+        <button onclick="document.getElementById('modal-config-contabil').classList.remove('open')"
           style="padding:9px 20px;border-radius:8px;background:var(--bg-card-hover);border:1px solid var(--border);color:var(--text-muted);font-size:13px;cursor:pointer;">
           Cancelar
         </button>
-        <button onclick="fopSalvarConfigFiscal()"
+        <button onclick="contSalvarConfigContabil()"
           style="padding:9px 24px;border-radius:8px;background:rgba(0,170,221,.15);border:1px solid rgba(0,170,221,.4);color:var(--cyan);font-size:13px;font-weight:700;cursor:pointer;">
           ✅ Salvar Configuração
         </button>
@@ -13133,6 +14832,24 @@ fopCarregar();
         <button onclick="fopAdicionarColaborador()" style="padding:9px 16px;border-radius:8px;background:rgba(0,170,221,.15);border:1px solid rgba(0,170,221,.4);color:var(--cyan);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">+ Adicionar</button>
       </div>
       <div id="colab-lista" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL COLABORADORES CONTÁBEIS ── -->
+<div class="modal-overlay" id="modal-colaboradores-contabil" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:440px;width:90%;max-height:85vh;display:flex;flex-direction:column;">
+    <div class="modal-header">
+      <div><div class="modal-title">👥 Colaboradores Contábeis</div>
+      <div class="modal-sub">Quem pode ser escolhido como responsável de uma empresa no Contábil</div></div>
+      <button class="modal-close" onclick="document.getElementById('modal-colaboradores-contabil').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:18px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;gap:8px;">
+        <input id="colabcont-novo-nome" type="text" placeholder="Nome do colaborador" onkeydown="if(event.key==='Enter')contAdicionarColaborador()" style="flex:1;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text-primary);">
+        <button onclick="contAdicionarColaborador()" style="padding:9px 16px;border-radius:8px;background:rgba(0,170,221,.15);border:1px solid rgba(0,170,221,.4);color:var(--cyan);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">+ Adicionar</button>
+      </div>
+      <div id="colabcont-lista" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
   </div>
 </div>
@@ -13169,6 +14886,27 @@ fopCarregar();
         <button onclick="chkSalvar()"
           style="padding:9px 24px;border-radius:8px;background:rgba(0,170,221,.15);border:1px solid rgba(0,170,221,.4);color:var(--cyan);font-size:13px;font-weight:700;cursor:pointer;">💾 Salvar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL APURAÇÃO MENSAL (CONTÁBIL) — checklist do mês de UMA empresa ── -->
+<div class="modal-overlay" id="modal-cont-apuracao" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" style="max-width:560px;max-height:85vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;" id="contap-mes-label">—</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-primary);" id="contap-titulo">—</div>
+      </div>
+      <button class="modal-close" onclick="document.getElementById('modal-cont-apuracao').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:10px;">
+      <input type="hidden" id="contap-cnpj">
+      <input type="hidden" id="contap-ano">
+      <input type="hidden" id="contap-mes">
+      <div id="contap-itens" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div id="contap-vazio-aviso" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>
+      <div id="contap-acess"></div>
     </div>
   </div>
 </div>
