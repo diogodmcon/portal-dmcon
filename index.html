@@ -479,6 +479,33 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
 
 /* Esconder hambúrguer no desktop */
 #mob-menu-btn{display:none;}
+
+/* Diogo, 16/09/2026: "manter tudo aberto, só diminuir o tamanho" — o resumo "Minhas
+   Empresas" e os cards de tarefa por imposto (aba Apurações) ficaram altos demais e
+   empurravam a lista de empresas pra fora da tela. Encolhe só esses dois blocos
+   (por id, então não mexe no .kpi-strip/.kpi-mini genérico usado em Contábil,
+   Comercial, Societário, Onboarding, Operação, Revisão, Comissões etc.) — mantém
+   tudo visível, só ocupando bem menos altura. */
+#fiscal-resumo-empresas-strip{padding:0;gap:8px;border-bottom:none;background:transparent;}
+#fiscal-resumo-empresas-strip .kpi-mini{padding:6px 10px;min-width:92px;}
+#fiscal-resumo-empresas-strip .kpi-lbl{font-size:8.5px;margin-bottom:2px;}
+#fiscal-resumo-empresas-strip .kpi-val{font-size:15px;}
+#fiscal-resumo-empresas-strip .kpi-tag{font-size:8.5px;padding:1px 5px;margin-top:2px;}
+
+/* Diogo, 16/09/2026: "vamos aproveitar e deixar mais compacto também a parte societária
+   e a parte comercial" — mesmo tratamento acima, só nesses dois KPI-strips (por id, não
+   mexe no .kpi-strip/.kpi-mini genérico usado em Contábil, Onboarding, Operação, Revisão,
+   Comissões etc.). */
+#com-kpi-strip,#soc-kpi-strip{padding:8px 28px;gap:8px;}
+#com-kpi-strip .kpi-mini,#soc-kpi-strip .kpi-mini{padding:7px 11px;min-width:100px;}
+#com-kpi-strip .kpi-lbl,#soc-kpi-strip .kpi-lbl{font-size:9px;margin-bottom:2px;}
+#com-kpi-strip .kpi-val,#soc-kpi-strip .kpi-val{font-size:16px;}
+#com-kpi-strip .kpi-tag,#soc-kpi-strip .kpi-tag{font-size:9px;padding:1px 5px;margin-top:2px;}
+/* Diogo, 16/09/2026: "aqui em Clientes ajustar as linhas, estão muito grossas" — linhas mais
+   finas só na tabela de Clientes (👥, page-operacao), sem mexer no th/td padrão usado nas
+   outras tabelas do sistema (Apurações, Comercial, Societário etc.) */
+#op-table-wrap th{padding:7px 14px;}
+#op-table-wrap td{padding:5px 14px;}
 </style>
   <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -892,18 +919,11 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
       </button>
     </div>
   </div>
-  <div class="kpi-strip">
-    <div class="kpi-mini k1"><div class="kpi-lbl">Leads Ativos</div><div class="kpi-val" id="com-kpi-ativos">0</div><div id="com-kpi-ativos-val" style="font-size:11px;font-weight:700;color:var(--cyan);margin-bottom:3px;"></div><div class="kpi-tag tag-blue">em aberto</div></div>
-    <div class="kpi-mini k6"><div class="kpi-lbl" id="com-kpi-entrados-lbl">Entrados Mês</div><div class="kpi-val" id="com-kpi-entrados">0</div><div class="kpi-tag tag-blue">período</div></div>
-    <div class="kpi-mini k2"><div class="kpi-lbl" id="com-kpi-fechados-lbl">Fechados no Mês</div><div class="kpi-val" id="com-kpi-fechados">0</div><div id="com-kpi-fechados-val" style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px;"></div><div class="kpi-tag tag-up">período</div></div>
-    <div class="kpi-mini k3"><div class="kpi-lbl">Em Negociação</div><div class="kpi-val" id="com-kpi-negoc">0</div><div id="com-kpi-negoc-val" style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:3px;"></div><div class="kpi-tag tag-warn">aguardam</div></div>
-    <div class="kpi-mini k4"><div class="kpi-lbl">Valor Fechado</div><div class="kpi-val" id="com-kpi-valor" style="font-size:15px">R$0</div><div class="kpi-tag tag-up">este mês</div></div>
-    <div class="kpi-mini k5"><div class="kpi-lbl">Perdidos</div><div class="kpi-val" id="com-kpi-perdidos">0</div><div id="com-kpi-perdidos-val" style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:3px;"></div><div class="kpi-tag tag-red">no mês</div></div>
-  </div>
 
   <!-- Filtros comercial -->
   <div class="filtros-bar" style="gap:6px;justify-content:space-between;flex-wrap:wrap;">
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input id="com-funil-busca" type="text" placeholder="🔎 Cliente, CNPJ ou segmento..." oninput="comFunilBuscar(this.value)" style="font-size:11.5px;padding:5px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-primary);min-width:200px;">
       <select id="com-mes-select" onchange="comFiltrarMes(this.value)" style="font-size:11.5px;padding:5px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-soft);cursor:pointer;">
         <option value="todos">📅 Todos os meses</option>
       </select>
@@ -919,51 +939,75 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
       <div style="display:flex;border:1.5px solid var(--border);border-radius:7px;overflow:hidden;">
         <button id="com-btn-view-kanban" onclick="comAlternarVisualizacao('kanban')" style="font-size:11.5px;font-weight:600;padding:5px 12px;border:none;cursor:pointer;background:var(--cyan-glow);color:var(--cyan);">🗂️ Kanban</button>
         <button id="com-btn-view-lista" onclick="comAlternarVisualizacao('lista')" style="font-size:11.5px;font-weight:600;padding:5px 12px;border:none;border-left:1.5px solid var(--border);cursor:pointer;background:transparent;color:var(--text-muted);">📋 Lista</button>
+        <button id="com-btn-view-indicadores" onclick="comAlternarVisualizacao('indicadores')" style="font-size:11.5px;font-weight:600;padding:5px 12px;border:none;border-left:1.5px solid var(--border);cursor:pointer;background:transparent;color:var(--text-muted);">📊 Indicadores</button>
       </div>
-      <button class="btn btn-ghost" id="com-btn-grafico" onclick="toggleGraficoMensalCom()" style="font-size:11.5px;padding:5px 12px;">📊 Fechados por mês</button>
     </div>
   </div>
 
-  <div id="com-grafico-mensal-wrap" style="display:none;margin:0 28px 12px;"></div>
-
-  <!-- PAINEL DE META MENSAL -->
-  <div id="painel-meta" style="margin:0 28px 0;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
-    <!-- Ícone + título -->
-    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-      <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#2450c4,#29c3f5);display:flex;align-items:center;justify-content:center;font-size:18px;">🎯</div>
-      <div>
-        <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text-primary);">Meta do Mês</div>
-        <div style="font-size:11px;color:var(--text-muted);" id="meta-mes-label">Junho 2026</div>
-      </div>
-    </div>
-
-    <!-- Barra de progresso -->
-    <div style="flex:1;min-width:200px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
-        <span style="font-size:12px;color:var(--text-soft);">Receita recorrente fechada</span>
-        <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;" id="meta-pct-label">0%</span>
-      </div>
-      <div style="height:10px;background:var(--bg-input);border-radius:6px;overflow:hidden;">
-        <div id="meta-barra" style="height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,#2450c4,#29c3f5);transition:width .6s ease;"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:5px;">
-        <span style="font-size:11px;color:var(--text-muted);">Fechado: <strong id="meta-valor-fechado" style="color:var(--cyan);">R$ 0</strong></span>
-        <span style="font-size:11px;color:var(--text-muted);">Faltam: <strong id="meta-valor-falta" style="color:var(--text-primary);">R$ 0</strong></span>
-      </div>
-    </div>
-
-    <!-- Meta atual + botão editar -->
-    <div style="text-align:right;flex-shrink:0;">
-      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;">Meta definida</div>
-      <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text-primary);" id="meta-valor-label">R$ 30.000</div>
-      <button onclick="abrirModalMeta()" style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:6px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;margin-top:5px;transition:all .15s;" onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">✏️ Editar meta</button>
-    </div>
-  </div>
+  <!-- Diogo, 16/09/2026: "deixar os indicadores... abrir uma aba do lado de Kanban e Lista
+       e escrever Indicadores. Aí quando a gente clicar em indicadores, a gente vê quantos por
+       cento da meta a gente está, relatórios de fechamento por responsável, fechamento por
+       mês... e na aba principal deixar os Kanbans" — os KPIs, a Meta do Mês e o gráfico
+       mensal (que antes ficavam sempre visíveis em cima do Kanban) mudaram pra cá, junto
+       com o novo relatório por responsável. O Kanban/Lista ficam só com o funil em si. -->
   <div class="content" id="com-kanban-content" style="overflow-x:auto;padding:16px 20px;">
     <div id="kanban-board" style="display:flex;gap:14px;min-width:max-content;align-items:flex-start;padding-bottom:8px;"></div>
   </div>
   <div class="content" id="com-lista-content" style="display:none;padding:16px 20px;">
     <div id="com-lista-wrap"></div>
+  </div>
+  <div class="content" id="com-indicadores-content" style="display:none;padding:14px 0 24px;overflow-y:auto;">
+    <div class="kpi-strip" id="com-kpi-strip" style="margin-bottom:14px;">
+      <div class="kpi-mini k1"><div class="kpi-lbl">Leads Ativos</div><div class="kpi-val" id="com-kpi-ativos">0</div><div id="com-kpi-ativos-val" style="font-size:11px;font-weight:700;color:var(--cyan);margin-bottom:3px;"></div><div class="kpi-tag tag-blue">em aberto</div></div>
+      <div class="kpi-mini k6"><div class="kpi-lbl" id="com-kpi-entrados-lbl">Entrados Mês</div><div class="kpi-val" id="com-kpi-entrados">0</div><div class="kpi-tag tag-blue">período</div></div>
+      <div class="kpi-mini k2"><div class="kpi-lbl" id="com-kpi-fechados-lbl">Fechados no Mês</div><div class="kpi-val" id="com-kpi-fechados">0</div><div id="com-kpi-fechados-val" style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px;"></div><div class="kpi-tag tag-up">período</div></div>
+      <div class="kpi-mini k3"><div class="kpi-lbl">Em Negociação</div><div class="kpi-val" id="com-kpi-negoc">0</div><div id="com-kpi-negoc-val" style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:3px;"></div><div class="kpi-tag tag-warn">aguardam</div></div>
+      <div class="kpi-mini k4"><div class="kpi-lbl">Valor Fechado</div><div class="kpi-val" id="com-kpi-valor" style="font-size:15px">R$0</div><div class="kpi-tag tag-up">este mês</div></div>
+      <div class="kpi-mini k5"><div class="kpi-lbl">Perdidos</div><div class="kpi-val" id="com-kpi-perdidos">0</div><div id="com-kpi-perdidos-val" style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:3px;"></div><div class="kpi-tag tag-red">no mês</div></div>
+    </div>
+
+    <!-- PAINEL DE META MENSAL -->
+    <div id="painel-meta" style="margin:0 28px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+      <!-- Ícone + título -->
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#2450c4,#29c3f5);display:flex;align-items:center;justify-content:center;font-size:18px;">🎯</div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text-primary);">Meta do Mês</div>
+          <div style="font-size:11px;color:var(--text-muted);" id="meta-mes-label">Junho 2026</div>
+        </div>
+      </div>
+
+      <!-- Barra de progresso -->
+      <div style="flex:1;min-width:200px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+          <span style="font-size:12px;color:var(--text-soft);">Receita recorrente fechada</span>
+          <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;" id="meta-pct-label">0%</span>
+        </div>
+        <div style="height:10px;background:var(--bg-input);border-radius:6px;overflow:hidden;">
+          <div id="meta-barra" style="height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,#2450c4,#29c3f5);transition:width .6s ease;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:5px;">
+          <span style="font-size:11px;color:var(--text-muted);">Fechado: <strong id="meta-valor-fechado" style="color:var(--cyan);">R$ 0</strong></span>
+          <span style="font-size:11px;color:var(--text-muted);">Faltam: <strong id="meta-valor-falta" style="color:var(--text-primary);">R$ 0</strong></span>
+        </div>
+      </div>
+
+      <!-- Meta atual + botão editar -->
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;">Meta definida</div>
+        <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text-primary);" id="meta-valor-label">R$ 30.000</div>
+        <button onclick="abrirModalMeta()" style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:6px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;margin-top:5px;transition:all .15s;" onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">✏️ Editar meta</button>
+      </div>
+    </div>
+
+    <div id="com-grafico-mensal-wrap" style="display:none;margin:0 28px 14px;"></div>
+
+    <!-- Diogo, 16/09/2026: "relatórios de fechamento por responsável" — novo, não existia. -->
+    <div style="margin:0 28px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;">
+      <div style="font-family:'Syne',sans-serif;font-size:12.5px;font-weight:800;color:var(--text-primary);margin-bottom:2px;">👤 Fechamento por responsável</div>
+      <div style="font-size:10.5px;color:var(--text-muted);margin-bottom:8px;">Clique numa linha pra filtrar só aquele responsável no Kanban/Lista</div>
+      <div id="com-indic-porresp"></div>
+    </div>
   </div>
 </div>
 
@@ -1008,6 +1052,49 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="document.getElementById('modal-meta').classList.remove('open')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarMeta()">Salvar Meta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LEMBRETE DIÁRIO DE TAREFAS (FISCAL) — Diogo, 16/09/2026: "o parâmetro vai ser a
+     meta interna... se eu colocar que o Natã tem que fechar o ICMS da empresa X até tal data,
+     é esse parâmetro que a gente vai usar... ele tem 16 tarefas pra executar hoje, além das
+     que ficaram em atraso de datas anteriores, e se ontem não concluiu, mostra quanto sobrou".
+     Usa as datas combinadas em Fiscal > Gerencial > Metas Internas. Aparece só pra quem tem
+     fiscalResp preenchido (analistas com empresas próprias) e só quando há meta interna
+     combinada pra hoje/atrasada/ontem — logo após o login. -->
+<div class="modal-overlay" id="modal-lembrete-fiscal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="width:420px;">
+    <div class="modal-header">
+      <div><div class="modal-title" id="lembrete-fiscal-titulo">📋 Suas tarefas de hoje</div><div class="modal-sub">Metas internas combinadas com você</div></div>
+      <button class="modal-close" onclick="document.getElementById('modal-lembrete-fiscal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="lembrete-fiscal-corpo" style="font-size:13px;color:var(--text-soft);line-height:1.6;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('modal-lembrete-fiscal').classList.remove('open')">Fechar</button>
+      <button class="btn btn-primary" onclick="document.getElementById('modal-lembrete-fiscal').classList.remove('open');navegar('fiscal',null);fiscalTab('apuracoes',null);">Ver minhas apurações</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LEMBRETE DE CONFERÊNCIA (FISCAL) — Diogo, 16/09/2026: "pra Nicolas e Marília, se
+     tiver empresa pra conferir, também vem um lembrete: Natã finalizou uma empresa que está
+     aguardando conferência." Aparece pra qualquer conferente (fopIsConferente()) quando há
+     itens com status "disponivel" (já enviados pelo analista), logo após o login. -->
+<div class="modal-overlay" id="modal-lembrete-conf" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="width:440px;">
+    <div class="modal-header">
+      <div><div class="modal-title">🔍 Aguardando conferência</div><div class="modal-sub">Apurações finalizadas pelos analistas</div></div>
+      <button class="modal-close" onclick="document.getElementById('modal-lembrete-conf').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="lembrete-conf-corpo" style="font-size:13px;color:var(--text-soft);line-height:1.6;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('modal-lembrete-conf').classList.remove('open')">Fechar</button>
+      <button class="btn btn-primary" onclick="document.getElementById('modal-lembrete-conf').classList.remove('open');navegar('fiscal',null);fiscalTab('conferencia',null);fiscalConfFiltrar('disponivel_novo',null);">Ver fila de conferência</button>
     </div>
   </div>
 </div>
@@ -1286,7 +1373,7 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
       </button>
     </div>
   </div>
-  <div class="kpi-strip">
+  <div class="kpi-strip" id="soc-kpi-strip">
     <div class="kpi-mini k5"><div class="kpi-lbl">Total em Andamento</div><div class="kpi-val" id="soc-kpi-total-andamento">0</div><div class="kpi-tag tag-purple">ativos</div></div>
     <div class="kpi-mini k1"><div class="kpi-lbl">Constituições</div><div class="kpi-val" id="soc-kpi-const">0</div><div class="kpi-tag tag-blue">ativas</div></div>
     <div class="kpi-mini k2"><div class="kpi-lbl">Alterações</div><div class="kpi-val" id="soc-kpi-alt">0</div><div class="kpi-tag tag-warn">ativas</div></div>
@@ -1907,7 +1994,8 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
     <div class="fsnav" onclick="contTab('checklist',this)">✅ Checklist</div>
     <div class="fsnav" onclick="contTab('conferencia',this)">🔎 Conferência</div>
     <div class="fsnav" onclick="contTab('gerencial',this)">📈 Gerencial</div>
-    <button onclick="contAbrirColaboradores()" style="margin-left:auto;padding:8px 14px;border-radius:7px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;">👥 Colaboradores</button>
+    <button id="cont-btn-limpar" onclick="contLimparDadosTeste()" style="display:none;margin-left:auto;padding:8px 14px;border-radius:7px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--red);font-size:12px;font-weight:600;cursor:pointer;" title="Apaga apurações, checklists marcados e obrigações acessórias salvos">🗑️ Limpar dados de teste</button>
+    <button onclick="contAbrirColaboradores()" style="padding:8px 14px;border-radius:7px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;">👥 Colaboradores</button>
   </div>
 
   <!-- ── EMPRESAS ── -->
@@ -2039,17 +2127,41 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
       <span id="fiscal-badge-conf" style="display:none;background:rgba(0,170,221,.15);border:1px solid rgba(0,170,221,.35);color:#38bdf8;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;"></span>
     </div>
   </div>
-  <!-- KPI Strip -->
-  <div class="kpi-strip" id="fiscal-kpi-strip">
-    <div class="kpi-mini k1" onclick="fopKpiFiltrar('todos')" style="cursor:pointer;"><div class="kpi-lbl">Total de Empresas</div><div class="kpi-val" id="fiscal-kpi-total">0</div><div class="kpi-tag tag-blue">ativas</div></div>
-    <div class="kpi-mini k3" onclick="fopKpiFiltrar('apurando')" style="cursor:pointer;"><div class="kpi-lbl">A Apurar</div><div class="kpi-val" id="fiscal-kpi-apurando">0</div><div class="kpi-tag tag-warn">andamento</div></div>
-    <div class="kpi-mini k6" onclick="fopKpiFiltrar('rotina_automatica')" style="cursor:pointer;"><div class="kpi-lbl">Rotina Automática</div><div class="kpi-val" id="fiscal-kpi-rotina">0</div><div class="kpi-tag" style="background:rgba(167,139,250,.15);color:#a78bfa;">PGDAS</div></div>
-    <div class="kpi-mini k6" onclick="fopKpiFiltrar('conferencia_final')" style="cursor:pointer;"><div class="kpi-lbl">Finalizar Rotina Automática</div><div class="kpi-val" id="fiscal-kpi-finalizar-rotina">0</div><div class="kpi-tag" style="background:rgba(251,146,60,.15);color:#fb923c;">PGDAS</div></div>
-    <div class="kpi-mini k5" onclick="fopAbrirConferenciaCard()" style="cursor:pointer;"><div class="kpi-lbl">Em Conferência</div><div class="kpi-val" id="fiscal-kpi-disponivel">0</div><div class="kpi-tag" style="background:rgba(100,180,255,.12);color:#60a5fa;">conferir</div></div>
-    <div class="kpi-mini k4" onclick="fopToggleCorrecaoInline()" style="cursor:pointer;"><div class="kpi-lbl">Em Correção</div><div class="kpi-val" id="fiscal-kpi-correcao">0</div><div class="kpi-tag tag-red">revisão</div></div>
-    <div class="kpi-mini k2" onclick="fopAbrirFinalizadosCard()" style="cursor:pointer;"><div class="kpi-lbl">Finalizadas</div><div class="kpi-val" id="fiscal-kpi-concluidas">0</div><div class="kpi-tag tag-up">concluídas</div></div>
+  <!-- Cards de TAREFA por imposto — Diogo, 16/09/2026: a aba Apurações agora é a tela de
+       trabalho do analista (os cards/KPIs gerais da empresa inteira foram pro "Dashboard
+       Fiscal", dentro de Gerencial → Visão Geral, só pra Diogo/Marília/Nicolas). Aqui cada
+       imposto vira um card com o que interessa pra quem está apurando: quanto falta apurar,
+       quanto já está em conferência (aguardando aprovação) e quanto já foi finalizado. Como
+       renderFiscalTable() já filtra a base inteira pelo `respMes` do usuário logado
+       (usuarioLogado.fiscalResp → _baseResp/_baseSemImp), esses cards já saem automaticamente
+       só com as empresas daquele analista — sem filtro extra nenhum. Gestores/conferentes
+       (fiscalResp vazio) continuam vendo todas. -->
+  <!-- Resumo geral das empresas do colaborador — Diogo, 16/09/2026: "eu quero também um card do
+       total de empresas que esse colaborador tem, pra ele visualizar... tenho X empresas sob o
+       meu cuidado, e aí aparece os status dessa empresa... 100 empresas, 100 a apurar, 100 em
+       correção, 100 finalizadas". É a mesma classificação POR EMPRESA (não por imposto) que já
+       existe no Dashboard Fiscal (Gerencial), só que aqui escopada às empresas do usuário logado
+       (mesma base _baseSemImp/_baseResp dos cards por imposto logo abaixo). -->
+  <div id="fiscal-resumo-strip" style="padding:8px 28px 0;">
+    <div style="font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;" id="fiscal-resumo-titulo">📌 Minhas empresas</div>
+    <div class="kpi-strip" id="fiscal-resumo-empresas-strip">
+      <div class="kpi-mini k1" onclick="fopKpiFiltrar('todos')" style="cursor:pointer;"><div class="kpi-lbl">Total de Empresas</div><div class="kpi-val" id="fiscal-resumo-total">0</div><div class="kpi-tag tag-blue">sob meu cuidado</div></div>
+      <div class="kpi-mini k3" onclick="fopKpiFiltrar('apurando')" style="cursor:pointer;"><div class="kpi-lbl">A Apurar</div><div class="kpi-val" id="fiscal-resumo-apurar">0</div><div class="kpi-tag tag-warn">andamento</div></div>
+      <div class="kpi-mini k6" onclick="fopKpiFiltrar('rotina_automatica')" style="cursor:pointer;"><div class="kpi-lbl">Rotina Automática</div><div class="kpi-val" id="fiscal-resumo-rotina">0</div><div class="kpi-tag" style="background:rgba(167,139,250,.15);color:#a78bfa;">PGDAS</div></div>
+      <div class="kpi-mini k6" onclick="fopKpiFiltrar('conferencia_final')" style="cursor:pointer;"><div class="kpi-lbl">Finalizar Rotina Automática</div><div class="kpi-val" id="fiscal-resumo-finalizar-rotina">0</div><div class="kpi-tag" style="background:rgba(251,146,60,.15);color:#fb923c;">PGDAS</div></div>
+      <div class="kpi-mini k5" onclick="fopAbrirConferenciaCard()" style="cursor:pointer;"><div class="kpi-lbl">Em Conferência</div><div class="kpi-val" id="fiscal-resumo-conferencia">0</div><div class="kpi-tag" style="background:rgba(100,180,255,.12);color:#60a5fa;">conferir</div></div>
+      <div class="kpi-mini k4" onclick="fopToggleCorrecaoInline()" style="cursor:pointer;"><div class="kpi-lbl">Em Correção</div><div class="kpi-val" id="fiscal-resumo-correcao">0</div><div class="kpi-tag tag-red">revisão</div></div>
+      <div class="kpi-mini k2" onclick="fopAbrirFinalizadosCard()" style="cursor:pointer;"><div class="kpi-lbl">Finalizadas</div><div class="kpi-val" id="fiscal-resumo-finalizadas">0</div><div class="kpi-tag tag-up">concluídas</div></div>
+    </div>
   </div>
-  <div id="fiscal-correcao-inline" style="display:none;padding:0 28px 14px;"></div>
+  <div id="fiscal-tarefas-strip" style="padding:5px 28px 0;">
+    <div style="font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:10px;">
+      <span id="fiscal-tarefas-titulo">📋 Minhas apurações, por imposto</span>
+      <span id="fiscal-tarefas-filtro-ativo" style="display:none;font-weight:600;text-transform:none;letter-spacing:0;color:var(--cyan);cursor:pointer;" onclick="fopFiltrarPorImposto(null)">· filtrando <b id="fiscal-tarefas-filtro-nome"></b> — clique pra limpar ✕</span>
+    </div>
+    <div id="fiscal-tarefas-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;"></div>
+  </div>
+  <div id="fiscal-correcao-inline" style="display:none;padding:0 28px 8px;"></div>
 
   <!-- ── APURAÇÕES ── -->
   <div id="fsub-apuracoes" class="fsub active">
@@ -2141,7 +2253,6 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
       <div class="ftab active" onclick="fiscalConfFiltrar('disponivel_novo',this)">🔵 Aguardando Conferência</div>
       <div class="ftab" onclick="fiscalConfFiltrar('disponivel_retorno',this)">🔁 Correções Retornadas</div>
       <div class="ftab" onclick="fiscalConfFiltrar('correcao',this)">🔴 Em Correção</div>
-      <div class="ftab" onclick="fiscalConfFiltrar('aprovado',this)">🟣 Aguardando Envio</div>
     </div>
     <div style="flex:1;overflow-y:auto;padding:12px 28px;">
       <div id="fiscal-conf-list" style="display:flex;flex-direction:column;gap:8px;"></div>
@@ -2162,6 +2273,26 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
       <div class="ftab" id="gtab-metas" onclick="fopGerencialTab('metas')">🎯 Metas Internas</div>
     </div>
     <div id="gerencial-visao" style="flex:1;overflow-y:auto;padding:16px 28px 20px;display:flex;flex-direction:column;gap:20px;">
+      <!-- Dashboard Fiscal — Diogo, 16/09/2026: "essa tela a gente pode chamar ela de dashboard
+           fiscal... quem vai ter acesso a essa tela? Eu, Diogo, Marília e Nicolas" — movido pra cá
+           (aba Gerencial, que já é restrita a esses 3 + gestores via fopRenderGerencial/_ehGestor)
+           porque a aba Apurações virou a tela de trabalho do analista (cards de tarefa por
+           imposto, ver #fiscal-tarefas-strip). Mostra SEMPRE todas as empresas, não filtra por
+           quem está logado — é a visão gerencial consolidada. -->
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text-primary);">📊 Dashboard Fiscal — Todas as Empresas</div>
+        <div class="kpi-strip" id="fiscal-kpi-strip">
+          <div class="kpi-mini k1" onclick="fopKpiFiltrar('todos')" style="cursor:pointer;"><div class="kpi-lbl">Total de Empresas</div><div class="kpi-val" id="fiscal-kpi-total">0</div><div class="kpi-tag tag-blue">ativas</div></div>
+          <div class="kpi-mini k3" onclick="fopKpiFiltrar('apurando')" style="cursor:pointer;"><div class="kpi-lbl">A Apurar</div><div class="kpi-val" id="fiscal-kpi-apurando">0</div><div class="kpi-tag tag-warn">andamento</div></div>
+          <div class="kpi-mini k6" onclick="fopKpiFiltrar('rotina_automatica')" style="cursor:pointer;"><div class="kpi-lbl">Rotina Automática</div><div class="kpi-val" id="fiscal-kpi-rotina">0</div><div class="kpi-tag" style="background:rgba(167,139,250,.15);color:#a78bfa;">PGDAS</div></div>
+          <div class="kpi-mini k6" onclick="fopKpiFiltrar('conferencia_final')" style="cursor:pointer;"><div class="kpi-lbl">Finalizar Rotina Automática</div><div class="kpi-val" id="fiscal-kpi-finalizar-rotina">0</div><div class="kpi-tag" style="background:rgba(251,146,60,.15);color:#fb923c;">PGDAS</div></div>
+          <div class="kpi-mini k5" onclick="fopAbrirConferenciaCard()" style="cursor:pointer;"><div class="kpi-lbl">Em Conferência</div><div class="kpi-val" id="fiscal-kpi-disponivel">0</div><div class="kpi-tag" style="background:rgba(100,180,255,.12);color:#60a5fa;">conferir</div></div>
+          <div class="kpi-mini k4" onclick="fopToggleCorrecaoInline()" style="cursor:pointer;"><div class="kpi-lbl">Em Correção</div><div class="kpi-val" id="fiscal-kpi-correcao">0</div><div class="kpi-tag tag-red">revisão</div></div>
+          <div class="kpi-mini k2" onclick="fopAbrirFinalizadosCard()" style="cursor:pointer;"><div class="kpi-lbl">Finalizadas</div><div class="kpi-val" id="fiscal-kpi-concluidas">0</div><div class="kpi-tag tag-up">concluídas</div></div>
+        </div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);margin:16px 0 8px;">📋 Apurações por imposto</div>
+        <div id="fiscal-imposto-cards" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
       <!-- KPIs globais -->
       <div id="fiscal-gerencial-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
       <!-- Painel de obrigações -->
@@ -2391,6 +2522,41 @@ td.nome-col{font-weight:500;color:var(--text-primary);}
   </div>
 </div>
 
+<!-- MODAL EDITAR CLIENTE — pra corrigir dados de um cliente já cadastrado (ex: mudou de regime
+     tributário). O CNPJ fica travado porque é a chave usada pra ligar esse cliente às configurações
+     do Fiscal e do Contábil — mudar aqui deixaria essas configurações "orfãs". -->
+<div class="modal-overlay" id="modal-editar-cliente" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title">✏️ Editar Cliente</div><div class="modal-sub" id="edit-cliente-sub">—</div></div>
+      <button class="modal-close" onclick="document.getElementById('modal-editar-cliente').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <input type="hidden" id="edit-cnpj-original">
+        <div class="form-group form-full"><label class="form-label">Nome / Razão Social</label><input class="form-input" id="edit-nome" placeholder="Ex: Tech Vision Comercial Ltda"></div>
+        <div class="form-group"><label class="form-label">CNPJ</label><input class="form-input" id="edit-cnpj" disabled style="opacity:.6;cursor:not-allowed;" title="O CNPJ não pode ser alterado aqui — ele é a chave usada pelas configurações do Fiscal e do Contábil"></div>
+        <div class="form-group"><label class="form-label">Regime Tributário</label>
+          <select class="form-select" id="edit-regime">
+            <option>Simples Nacional</option><option>Lucro Presumido</option><option>Lucro Real</option><option>MEI</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">UF</label><input class="form-input" id="edit-uf" placeholder="Ex: SC" maxlength="2" style="text-transform:uppercase;"></div>
+        <div class="form-group"><label class="form-label">Cidade</label><input class="form-input" id="edit-cidade" placeholder="Ex: Itajaí"></div>
+        <div class="form-group"><label class="form-label">Data de Início</label><input class="form-input" type="date" id="edit-inicio"></div>
+        <div class="form-group"><label class="form-label">Resp. Contábil</label><input class="form-input" id="edit-contabil" placeholder="Nome"></div>
+        <div class="form-group"><label class="form-label">Resp. Fiscal</label><input class="form-input" id="edit-fiscal" placeholder="Nome"></div>
+        <div class="form-group"><label class="form-label">Resp. DP</label><input class="form-input" id="edit-dp" placeholder="Nome ou —"></div>
+        <div class="form-group"><label class="form-label">Comercial</label><input class="form-input" id="edit-comercial" placeholder="Nome ou —"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('modal-editar-cliente').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEdicaoCliente()">Salvar Alterações</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <!-- MODAL ALTERAR SENHA -->
@@ -2529,6 +2695,134 @@ function fopNotificarTarefasPendentes(user){
   }
 }
 
+// ══════════════════════════════════════════════════════
+// LEMBRETE DIÁRIO DE TAREFAS (FISCAL) — Diogo, 16/09/2026, ajustado no mesmo dia: "o parâmetro
+// vai ser a meta interna. Se eu colocar que o Natã tem que fechar o ICMS da empresa X até tal
+// data, é esse parâmetro que vamos usar... ele tem 15 empresas pra fechar o ICMS dia 16, ele
+// entrar hoje e vai falar: você tem 16 tarefas pra executar hoje, além das que ficaram em
+// atraso de datas anteriores... e se ontem ele não concluiu as tarefas que tinha, mostra
+// quantas sobraram." Usa o sistema de "Metas Internas" que já existe (Fiscal > Gerencial >
+// Metas Internas, fopPrazosInternos/fopGetPrazos) — data combinada por empresa+imposto+mês.
+// Só entra na conta quem TEM uma meta interna combinada; sem data combinada, não conta nem
+// como "de hoje" nem como "atrasada" aqui (o parâmetro é sempre a data da meta interna).
+function fopLembreteDataStr(d){ return d.toISOString().slice(0,10); }
+
+async function fopLembreteTarefasDiario(user){
+  try{
+    const resp = user && user.fiscalResp;
+    if(!resp) return; // gestores/conferentes comuns não têm fiscalResp — ver fopLembreteConferencia
+    if(typeof fopBuildClientes!=='function' || typeof fopPrazosInternos==='undefined' || typeof fopApur==='undefined') return;
+
+    const hoje = new Date();
+    const hojeStr = fopLembreteDataStr(hoje);
+    const ontem = new Date(hoje); ontem.setDate(ontem.getDate()-1);
+    const ontemStr = fopLembreteDataStr(ontem);
+
+    // Cobre virada de mês: uma meta combinada pro dia 30 do mês passado ainda pode estar
+    // "recém-atrasada" no dia 1-2 do mês novo, então olha o mês atual + o anterior.
+    const anoAtual = hoje.getFullYear(), mesAtual = hoje.getMonth()+1;
+    const anoAnt = mesAtual===1 ? anoAtual-1 : anoAtual;
+    const mesAnt = mesAtual===1 ? 12 : mesAtual-1;
+    const bucketAtual = cnpj => `${cnpj}_${anoAtual}_${String(mesAtual).padStart(2,'0')}`;
+    const bucketAnt   = cnpj => `${cnpj}_${anoAnt}_${String(mesAnt).padStart(2,'0')}`;
+
+    const clientes = fopBuildClientes().filter(c=>!c.pendente && (c.respMes||'').toUpperCase().includes(resp.toUpperCase()));
+
+    let venceHoje=0, atrasadas=0, venciamOntemTotal=0, venciamOntemNaoFeitas=0;
+    clientes.forEach(c=>{
+      [[bucketAtual(c.cnpj)],[bucketAnt(c.cnpj)]].forEach(([key])=>{
+        const prazos = fopPrazosInternos[key] || {};
+        const apur = fopApur[key] || {};
+        fopGetImpostos(c).forEach(imp=>{
+          const dataPrazo = prazos[imp];
+          if(!dataPrazo) return; // sem meta interna combinada pra essa obrigação
+          const st = (apur[imp]||{}).status || '';
+          // 'disponivel' já foi enviado pra conferência — a parte do analista está feita.
+          const feita = st==='finalizado' || st==='disponivel';
+          if(!feita){
+            if(dataPrazo===hojeStr) venceHoje++;
+            else if(dataPrazo<hojeStr) atrasadas++;
+          }
+          if(dataPrazo===ontemStr){
+            venciamOntemTotal++;
+            if(!feita) venciamOntemNaoFeitas++;
+          }
+        });
+      });
+    });
+
+    if(venceHoje===0 && atrasadas===0 && venciamOntemTotal===0) return; // nada combinado — não incomoda à toa
+
+    let msg = '';
+    if(venciamOntemTotal>0){
+      msg += venciamOntemNaoFeitas===0
+        ? '🎉 Ontem você concluiu tudo que vencia ontem, parabéns!<br>'
+        : `⚠️ Você não concluiu <strong>${venciamOntemNaoFeitas}</strong> tarefa${venciamOntemNaoFeitas>1?'s':''} que vencia${venciamOntemNaoFeitas>1?'m':''} ontem.<br>`;
+    }
+    const partes = [];
+    if(venceHoje>0) partes.push(`<strong>${venceHoje}</strong> tarefa${venceHoje>1?'s':''} pra executar hoje`);
+    if(atrasadas>0) partes.push(`<strong>${atrasadas}</strong> em atraso de dias anteriores`);
+    msg += partes.length ? ('Hoje você tem ' + partes.join(' e ') + '.') : '✅ Nada vencendo hoje — só fique de olho no que já está em atraso.';
+
+    fopAbrirModalLembrete(msg, venceHoje+atrasadas);
+  }catch(e){ /* nunca deixa o lembrete travar o login */ }
+}
+
+function fopAbrirModalLembrete(mensagemHtml, totalHoje){
+  const corpo = document.getElementById('lembrete-fiscal-corpo');
+  const titulo = document.getElementById('lembrete-fiscal-titulo');
+  if(!corpo) return;
+  corpo.innerHTML = mensagemHtml;
+  if(titulo) titulo.textContent = totalHoje===0 ? '✅ Tudo em dia!' : '📋 Suas tarefas de hoje';
+  document.getElementById('modal-lembrete-fiscal').classList.add('open');
+}
+
+// ══════════════════════════════════════════════════════
+// LEMBRETE DE CONFERÊNCIA (FISCAL) — Diogo, 16/09/2026: "para o Nicolas e para a Marília,
+// quando eles entrarem, se tiver empresa pra conferir, também vem um lembrete de conferência.
+// Por exemplo: Natã finalizou uma empresa que está aguardando conferência." Mostra quem tem
+// itens com status 'disponivel' (já enviado pelo analista, esperando aprovação) — a fila de
+// conferência já é compartilhada entre todos os conferentes, então a mensagem é a mesma pra
+// Marília e pro Nicolas (quem aprovar primeiro resolve).
+function fopLembreteConferencia(user){
+  try{
+    if(typeof fopIsConferente!=='function' || !fopIsConferente()) return;
+    if(typeof fopBuildClientes!=='function' || typeof fopApur==='undefined') return;
+
+    const hoje = new Date();
+    const key = cnpj => `${cnpj}_${hoje.getFullYear()}_${String(hoje.getMonth()+1).padStart(2,'0')}`;
+    const clientes = fopBuildClientes().filter(c=>!c.pendente);
+    const itens = [];
+    clientes.forEach(c=>{
+      const apur = fopApur[key(c.cnpj)] || {};
+      fopGetImpostos(c).forEach(imp=>{
+        const reg = apur[imp];
+        if(reg && reg.status==='disponivel'){
+          itens.push({ empresa: c.nome, imposto: (typeof FOP_LABELS!=='undefined'&&FOP_LABELS[imp])||imp, analista: reg.apurador||'' });
+        }
+      });
+    });
+    if(!itens.length) return;
+
+    const porAnalista = {};
+    itens.forEach(it=>{ const n=it.analista||'sem responsável identificado'; porAnalista[n]=(porAnalista[n]||0)+1; });
+    const resumo = Object.entries(porAnalista).sort((a,b)=>b[1]-a[1]).map(([nome,qtd])=>`${qtd} de ${nome}`).join(', ');
+
+    let corpo = `Você tem <strong>${itens.length}</strong> ite${itens.length>1?'ns':'m'} aguardando conferência (${resumo}).`;
+    if(itens.length<=6){
+      corpo += '<ul style="margin:10px 0 0 18px;padding:0;">' + itens.map(it=>`<li>${it.imposto} — ${it.empresa} <span style="color:var(--text-muted);">(${it.analista||'—'})</span></li>`).join('') + '</ul>';
+    }
+    fopAbrirModalLembreteConferencia(corpo);
+  }catch(e){ /* nunca deixa o lembrete travar o login */ }
+}
+
+function fopAbrirModalLembreteConferencia(mensagemHtml){
+  const corpo = document.getElementById('lembrete-conf-corpo');
+  if(!corpo) return;
+  corpo.innerHTML = mensagemHtml;
+  document.getElementById('modal-lembrete-conf').classList.add('open');
+}
+
 // Saudação da tela Hub — varia a cada entrada (não fica sempre igual), misturando o período do
 // dia (bom dia/tarde/noite) com frases diferentes, sempre usando só o primeiro nome.
 function gerarSaudacaoHub(nomeCompleto){
@@ -2571,7 +2865,7 @@ async function fazerLogin(){
     if(hw) hw.textContent = gerarSaudacaoHub(localUser.nome);
     document.getElementById('hub-screen').classList.add('active');
     renderHubModulos();
-    carregarDados();
+    carregarDados().then(()=>{ fopLembreteTarefasDiario(localUser); fopLembreteConferencia(localUser); }).catch(()=>{});
     iniciarPollingMensagens();
     iniciarRealtime();
     iniciarPollingSync();
@@ -2640,7 +2934,7 @@ async function fazerLogin(){
 
     const paginaInicial = data.acesso.includes('assistente') ? 'assistente' : (data.acesso.includes('dashboard') ? 'dashboard' : data.acesso[0]);
     navegar(paginaInicial, null);
-    carregarDados();
+    carregarDados().then(()=>{ fopLembreteTarefasDiario(data); fopLembreteConferencia(data); }).catch(()=>{});
     iniciarPollingMensagens();
     iniciarRealtime();
     iniciarPollingSync();
@@ -2669,6 +2963,7 @@ async function carregarClientes(){
     if(!error && data){
       // Mapear campos do Supabase para o formato do portal
       opClientes = data.map(c=>({
+        id: c.id,
         cod: c.cod||'',
         nome: c.nome||'',
         cnpj: c.cnpj||'',
@@ -2749,6 +3044,19 @@ function aplicarAcesso(user){
   });
   const _btnLimpar=document.getElementById('fop-btn-limpar');
   if(_btnLimpar) _btnLimpar.style.display=_ehConferente?'':'none';
+  // "🗑️ Limpar dados de teste" do Contábil — igual ao do Fiscal, só que mais restrito: só Diogo e
+  // Marília (o Fiscal também libera pro Nicolas, mas o Diogo pediu explicitamente "somente eu e a
+  // Marília" pra essa do Contábil, então não reaproveita o _ehConferente de cima).
+  const _btnLimparCont=document.getElementById('cont-btn-limpar');
+  if(_btnLimparCont) _btnLimparCont.style.display=contPodeLimparTeste(user)?'':'none';
+}
+// Só Diogo (login "DIOGO" ou "MASTER" — são a mesma pessoa) e Marília — igual ao "podeExcluir" já
+// usado em Clientes, ver excluirCliente(). Recebe o usuário opcionalmente (aplicarAcesso já tem a
+// mão nele); sem argumento, usa o usuarioLogado global.
+function contPodeLimparTeste(user){
+  const u=user||(typeof usuarioLogado!=='undefined'?usuarioLogado:null);
+  const _u=(u&&u.usuario||'').toUpperCase();
+  return _u==='DIOGO'||_u==='MASTER'||_u==='MARILIA';
 }
 
 function abrirAlterarSenha(){
@@ -2893,6 +3201,8 @@ function fazerLogout(){
   document.querySelectorAll('.conf-restrito').forEach(elx=>elx.classList.add('conf-hidden'));
   const _btnLimparOut=document.getElementById('fop-btn-limpar');
   if(_btnLimparOut) _btnLimparOut.style.display='none';
+  const _btnLimparContOut=document.getElementById('cont-btn-limpar');
+  if(_btnLimparContOut) _btnLimparContOut.style.display='none';
 }
 
 function toggleSenha(){
@@ -3339,6 +3649,8 @@ function opRender(){
     const _usr=(usuarioLogado?.usuario||'').toUpperCase();
     const podeInativar=['DIOGO','MASTER','MARILIA','CAMILA','ANDREZA'].includes(_usr);
     const podeExcluir=['DIOGO','MASTER','MARILIA'].includes(_usr);
+    const cnpjEsc=(c.cnpj||'').replace(/'/g,"\\'");
+    const btnEditar=`<button onclick="event.stopPropagation();abrirEditarCliente('${cnpjEsc}')" title="Editar dados do cliente (ex: mudou de regime tributário)" style="font-size:10.5px;padding:3px 9px;border-radius:6px;border:1px solid var(--border-acc);background:var(--bg-card-hover);color:var(--cyan);cursor:pointer;margin-right:4px;">✏️ Editar</button>`;
     const btnStatus = ativo
       ? (podeInativar ? `<button onclick="toggleAtivoCliente('${c.id}',true)" style="font-size:10.5px;padding:3px 9px;border-radius:6px;border:1px solid rgba(255,77,106,.4);background:rgba(255,77,106,.08);color:var(--red);cursor:pointer;">Inativar</button>` : '')
       : `${podeInativar?`<button onclick="toggleAtivoCliente('${c.id}',false)" style="font-size:10.5px;padding:3px 9px;border-radius:6px;border:1px solid rgba(0,200,150,.4);background:rgba(0,200,150,.08);color:var(--green);cursor:pointer;">Reativar</button>`:''}
@@ -3355,7 +3667,7 @@ function opRender(){
       <td style="font-size:11.5px">${c.respContabil||'—'}</td>
       <td style="font-size:11.5px">${c.respPessoal||'—'}</td>
       <td style="font-size:11.5px">${c.comercial||'—'}</td>
-      <td>${btnStatus}</td>
+      <td>${btnEditar}${btnStatus}</td>
     </tr>`;
   }).join('');
 
@@ -3404,6 +3716,75 @@ async function excluirCliente(id, nome){
   const {error} = await sb.from('clientes').delete().eq('id', id);
   if(error){ mostrarToast('⚠️ Erro ao excluir: '+error.message); }
   else mostrarToast('🗑 Cliente excluído permanentemente');
+}
+
+// ── EDITAR CLIENTE — pedido do Diogo: "teve um cliente que mudou de regime tributário" e não
+// tinha como corrigir os dados sem excluir e recadastrar. Identifica o cliente pelo CNPJ (não pelo
+// "id"), porque clientes carregados do Supabase às vezes ficam sem "id" preenchido — ver
+// carregarClientes() — enquanto CNPJ é sempre exigido e único. Por isso o CNPJ fica travado no
+// modal: mudar o CNPJ aqui perderia a referência com as configurações do Fiscal/Contábil.
+function abrirEditarCliente(cnpj){
+  const c=opClientes.find(x=>x.cnpj===cnpj);
+  if(!c){ mostrarToast('Cliente não encontrado'); return; }
+  document.getElementById('edit-cliente-sub').textContent=c.nome||cnpj;
+  document.getElementById('edit-cnpj-original').value=c.cnpj||'';
+  document.getElementById('edit-nome').value=c.nome||'';
+  document.getElementById('edit-cnpj').value=c.cnpj||'';
+  document.getElementById('edit-regime').value=c.regime||'Simples Nacional';
+  document.getElementById('edit-uf').value=c.uf||'';
+  document.getElementById('edit-cidade').value=c.cidade||'';
+  document.getElementById('edit-inicio').value=c.inicio||'';
+  document.getElementById('edit-contabil').value=c.respContabil||'';
+  document.getElementById('edit-fiscal').value=c.respFiscal||'';
+  document.getElementById('edit-dp').value=c.respPessoal||'';
+  document.getElementById('edit-comercial').value=c.comercial||'';
+  document.getElementById('modal-editar-cliente').classList.add('open');
+}
+
+async function salvarEdicaoCliente(){
+  const cnpjOriginal=document.getElementById('edit-cnpj-original').value;
+  const c=opClientes.find(x=>x.cnpj===cnpjOriginal);
+  if(!c){ mostrarToast('Cliente não encontrado'); return; }
+  const nome=document.getElementById('edit-nome').value.trim();
+  if(!nome){ mostrarToast('⚠️ Nome é obrigatório'); return; }
+  c.nome=nome;
+  c.regime=document.getElementById('edit-regime').value;
+  c.uf=document.getElementById('edit-uf').value.trim().toUpperCase();
+  c.cidade=document.getElementById('edit-cidade').value.trim();
+  c.inicio=document.getElementById('edit-inicio').value||'';
+  c.respContabil=document.getElementById('edit-contabil').value.trim();
+  c.respFiscal=document.getElementById('edit-fiscal').value.trim();
+  c.respPessoal=document.getElementById('edit-dp').value.trim();
+  c.comercial=document.getElementById('edit-comercial').value.trim();
+  document.getElementById('modal-editar-cliente').classList.remove('open');
+  opRender();
+  mostrarToast('✅ Cliente atualizado!');
+  const ok=await atualizarClienteSupabase(c);
+  if(!ok) mostrarToast('⚠️ Salvo aqui, mas houve erro ao sincronizar com o servidor');
+}
+
+// UPDATE (não upsert) casando pelo CNPJ — usar salvarClienteSupabase() aqui criaria risco de
+// duplicar a linha no Supabase, já que aquele upsert não informa a chave primária "id" (que, como
+// visto em carregarClientes(), nem sempre está preenchida no cliente local).
+async function atualizarClienteSupabase(cliente){
+  try {
+    const { error } = await sb.from('clientes').update({
+      nome:         cliente.nome,
+      regime:       cliente.regime,
+      uf:           cliente.uf,
+      cidade:       cliente.cidade,
+      resp_fiscal:  cliente.respFiscal,
+      resp_contabil:cliente.respContabil,
+      resp_pessoal: cliente.respPessoal,
+      comercial:    cliente.comercial,
+      inicio:       cliente.inicio || null,
+    }).eq('cnpj', cliente.cnpj);
+    if(error) throw error;
+    return true;
+  } catch(e) {
+    console.warn('Erro ao atualizar cliente:', e.message);
+    return false;
+  }
 }
 
 function atualizarKpisOp(){
@@ -4890,9 +5271,13 @@ const ETAPAS_KANBAN = [
 let leads = [];
 let tipoProc = 'constituicao';
 
-// ── Filtros do Comercial (vendedor / mês de entrada) ──
+// ── Filtros do Comercial (vendedor / mês de entrada / busca) ──
 let comFiltroResp = 'todos';
 let comFiltroMes  = 'todos';
+// Diogo, 16/09/2026: "eu gostaria também de um campo pesquisa... pesquisar o cliente,
+// pesquisar um campo que eu consiga digitar e pesquisar algo dentro da parte comercial" —
+// nome não pode ser comBuscar (já existe pra Comissões, ver comBuscar/comBuscaTermo).
+let comFiltroBusca = '';
 let comVisualizacao = 'kanban'; // 'kanban' | 'lista' — como o funil é exibido
 
 // Fonte única de verdade: usada tanto pelo Kanban quanto pelos KPIs,
@@ -4901,21 +5286,24 @@ function comListaFiltrada(){
   return leads.filter(l=>{
     const rOk = comFiltroResp==='todos' || l.responsavel===comFiltroResp;
     const mOk = comFiltroMes==='todos'  || l.mes_abertura===comFiltroMes || l.mes_conclusao===comFiltroMes;
-    return rOk && mOk;
+    const bOk = !comFiltroBusca || [l.nome,l.cnpj,l.segmento,l.responsavel].some(v=>(v||'').toLowerCase().includes(comFiltroBusca));
+    return rOk && mOk && bOk;
   });
 }
 
 function comFiltrarResp(val){ comFiltroResp=val; renderKanban(); }
 function comFiltrarMes(val){ comFiltroMes=val; renderKanban(); }
+function comFunilBuscar(val){ comFiltroBusca=(val||'').trim().toLowerCase(); renderKanban(); }
 
 function comTemFiltroAtivo(){
-  return comFiltroResp!=='todos' || comFiltroMes!=='todos';
+  return comFiltroResp!=='todos' || comFiltroMes!=='todos' || comFiltroBusca!=='';
 }
 
 function comLimparFiltros(){
-  comFiltroResp='todos'; comFiltroMes='todos';
+  comFiltroResp='todos'; comFiltroMes='todos'; comFiltroBusca='';
   const selResp = document.getElementById('com-resp-select'); if(selResp) selResp.value='todos';
   const selMes  = document.getElementById('com-mes-select');  if(selMes)  selMes.value='todos';
+  const inpBusca = document.getElementById('com-funil-busca'); if(inpBusca) inpBusca.value='';
   renderKanban();
 }
 
@@ -5299,17 +5687,34 @@ function renderKanban(){
 // Alterna entre visualização em Kanban (colunas) e em Lista (tabela agrupada por etapa).
 // Não refaz a busca de dados — só troca qual bloco fica visível e garante que a lista
 // esteja atualizada com os mesmos filtros/dados do Kanban.
+// Diogo, 16/09/2026: 3ª visualização "Indicadores" (além de Kanban/Lista) — junta os KPIs,
+// a Meta do Mês, o gráfico "Fechados por mês" e o relatório "por responsável" que antes
+// ficavam sempre visíveis em cima do funil.
+let comIndicJaAbriu = false; // controla se já auto-expandiu o gráfico mensal uma vez
 function comAlternarVisualizacao(modo){
   comVisualizacao = modo;
   const kanbanContent = document.getElementById('com-kanban-content');
   const listaContent  = document.getElementById('com-lista-content');
+  const indicContent  = document.getElementById('com-indicadores-content');
   const btnKanban = document.getElementById('com-btn-view-kanban');
   const btnLista  = document.getElementById('com-btn-view-lista');
+  const btnIndic  = document.getElementById('com-btn-view-indicadores');
   if(kanbanContent) kanbanContent.style.display = modo==='kanban' ? '' : 'none';
   if(listaContent)  listaContent.style.display  = modo==='lista'  ? '' : 'none';
-  if(btnKanban){ btnKanban.style.background = modo==='kanban' ? 'var(--cyan-glow)' : 'transparent'; btnKanban.style.color = modo==='kanban' ? 'var(--cyan)' : 'var(--text-muted)'; }
-  if(btnLista){  btnLista.style.background  = modo==='lista'  ? 'var(--cyan-glow)' : 'transparent';  btnLista.style.color  = modo==='lista'  ? 'var(--cyan)' : 'var(--text-muted)'; }
+  if(indicContent)  indicContent.style.display  = modo==='indicadores' ? '' : 'none';
+  [[btnKanban,'kanban'],[btnLista,'lista'],[btnIndic,'indicadores']].forEach(([btn,key])=>{
+    if(!btn) return;
+    btn.style.background = modo===key ? 'var(--cyan-glow)' : 'transparent';
+    btn.style.color      = modo===key ? 'var(--cyan)' : 'var(--text-muted)';
+  });
   if(modo==='lista') renderListaCom();
+  if(modo==='indicadores'){
+    const graficoWrap = document.getElementById('com-grafico-mensal-wrap');
+    if(graficoWrap) graficoWrap.style.display = 'block';
+    if(!comIndicJaAbriu){ comGraficoExpandido = true; comIndicJaAbriu = true; }
+    renderGraficoMensalCom();
+    renderIndicPorResponsavel();
+  }
 }
 
 // Lista em tabela, agrupada por etapa (mesma ordem/cores do Kanban) — usa a mesma
@@ -5592,6 +5997,63 @@ function atualizarKpisKanban(){
   if(document.getElementById('com-grafico-mensal-wrap')?.style.display==='block'){
     renderGraficoMensalCom();
   }
+  renderIndicPorResponsavel();
+}
+
+// Diogo, 16/09/2026: "relatórios de fechamento por responsável" — parte da aba Indicadores.
+// Usa os MESMOS filtros de mês e busca do Kanban (não o de vendedor — aqui o objetivo é
+// justamente comparar um responsável com o outro lado a lado).
+function comIndicFiltrarResp(nome){
+  if(!nome || nome==='Sem responsável') return;
+  const sel = document.getElementById('com-resp-select');
+  if(sel) sel.value = nome;
+  comFiltrarResp(nome);
+  comAlternarVisualizacao('kanban');
+  mostrarToast('🔎 Filtrando leads de ' + nome);
+}
+
+function renderIndicPorResponsavel(){
+  const el = document.getElementById('com-indic-porresp');
+  if(!el) return;
+  const modoTodos = comFiltroMes==='todos';
+  const base = comFiltroBusca
+    ? leads.filter(l=>[l.nome,l.cnpj,l.segmento,l.responsavel].some(v=>(v||'').toLowerCase().includes(comFiltroBusca)))
+    : leads;
+  const porResp = {};
+  base.forEach(l=>{
+    const nome = l.responsavel || 'Sem responsável';
+    if(!porResp[nome]) porResp[nome] = {ativos:0, fechados:0, valor:0, perdidos:0};
+    if(l.etapa==='fechado'){
+      const noMes = modoTodos || (l.mes_conclusao ? l.mes_conclusao===comFiltroMes : l.mes_abertura===comFiltroMes);
+      if(noMes){ porResp[nome].fechados++; porResp[nome].valor += (l.valor_estimado||0); }
+    } else if(l.etapa==='perdido'){
+      porResp[nome].perdidos++;
+    } else {
+      porResp[nome].ativos++;
+    }
+  });
+  const nomes = Object.keys(porResp).sort((a,b)=>porResp[b].valor-porResp[a].valor);
+  if(!nomes.length){
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:6px 0;">Nenhum lead cadastrado ainda.</div>';
+    return;
+  }
+  const fmtR$ = v => 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1.4fr .8fr .8fr 1fr .8fr;gap:0;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);padding:5px 8px;border-bottom:1px solid var(--border);">
+      <div>Responsável</div><div>Ativos</div><div>Fechados</div><div>Valor Fechado</div><div>Perdidos</div>
+    </div>
+    ${nomes.map(nome=>{
+      const d = porResp[nome];
+      const clicavel = nome!=='Sem responsável';
+      return `<div ${clicavel?`onclick="comIndicFiltrarResp('${nome}')" title="Clique pra filtrar só ${nome}"`:''} style="display:grid;grid-template-columns:1.4fr .8fr .8fr 1fr .8fr;gap:0;font-size:11.5px;padding:6px 8px;border-bottom:1px solid var(--border);${clicavel?'cursor:pointer;':''}">
+        <div style="color:var(--text-primary);font-weight:600;">${clicavel?'👤 ':'⚠️ '}${nome}</div>
+        <div style="color:var(--text-soft);">${d.ativos}</div>
+        <div style="color:var(--cyan);font-weight:600;">${d.fechados}</div>
+        <div style="color:var(--green);font-weight:700;">${fmtR$(d.valor)}</div>
+        <div style="color:var(--red);">${d.perdidos}</div>
+      </div>`;
+    }).join('')}
+  `;
 }
 
 // Rótulo "Mmm/AAAA" do mês selecionado no filtro do Comercial (ou vazio se for "todos")
@@ -9519,6 +9981,37 @@ const FOP_CHECKLISTS = {
 // Obrigações que entram na nova aba "Obrigações Acessórias" — geradas automaticamente por regime/IE (ver fopGetAcessorias)
 const FOP_ACESSORIAS = ['efd_contrib','efd_reinf','mit','sped_fiscal','sintegra','destda'];
 
+// 'Postado no NIBO' e 'Sem Movimento' são dois FINAIS ALTERNATIVOS do mesmo checklist — só um
+// deles se aplica por mês (empresa COM movimento nunca marca "Sem Movimento", e vice-versa).
+// Sem esse ajuste, o item do caminho não usado ficava pra sempre pendente no denominador e o
+// checklist nunca chegava a 100% mesmo com tudo que realmente se aplica já feito (ex: 10/11 = 91%
+// quando na prática só faltava um item que nem deveria contar). Diogo, 16/09/2026: "se eu
+// selecionar tudo menos o sem movimento, ele não tem que entrar para o percentual".
+// O status intermediário 'aprovado' (aguardando envio em lote ao cliente) foi removido do fluxo —
+// Diogo, 16/09/2026: aprovar agora já finaliza na hora, sem etapa de "enviar ao cliente" separada.
+// Isso promove qualquer registro antigo que tenha ficado parado em 'aprovado' (de antes dessa
+// mudança, ex: PIS/COFINS e ISS da 2RA Empreendimentos) direto pra 'finalizado', pra não sumir
+// sem deixar rastro numa tela que não existe mais.
+function fopMigrarAprovadosParaFinalizado(){
+  let mudou=false;
+  Object.values(fopApur).forEach(mesObj=>{
+    Object.values(mesObj||{}).forEach(d=>{
+      if(d&&d.status==='aprovado'){ d.status='finalizado'; if(!d.tsFim) d.tsFim=new Date().toISOString(); mudou=true; }
+    });
+  });
+  if(mudou) fopSalvar();
+}
+function fopChecklistCount(items, checklist){
+  const chk=checklist||[];
+  const idxSemMov=items.indexOf('Sem Movimento');
+  let total=items.length, done=0;
+  for(let i=0;i<items.length;i++){
+    if(i===idxSemMov&&!chk[idxSemMov]){ total--; continue; } // caminho "Sem Movimento" não usado neste mês — não conta
+    if(chk[i]) done++;
+  }
+  return {done, total};
+}
+
 // PGDAS — Etapas 2 e 3 do fluxo (a Etapa 1 é FOP_CHECKLISTS.pgdas). O campo d.etapa (1|2|3), guardado
 // dentro do registro de apuração do pgdas, decide qual dessas listas aparece no checklist — ver
 // fopPgdasItems(). A Etapa 2 (Rotina Automática) é de Marília, Nicolas e Diogo (fopIsRotinaAutomatica()).
@@ -9551,6 +10044,18 @@ let fopTarefas = [];
 let fopHistorico = [];
 let fopFiltroRegime2 = 'todos';
 let fopFiltroStatus2 = 'todos';
+// Diogo, 16/09/2026: precisa controlar quantas empresas AINDA FALTAM entregar cada imposto
+// separadamente (ICMS vence no início do mês, PIS/COFINS no fim — não dá pra ver isso num card
+// "A Apurar" que só olha a empresa inteira). null = nenhum card de imposto selecionado.
+let fopFiltroImposto = null;
+// Diogo, 16/09/2026: as linhas por imposto do "Dashboard Fiscal" (Gerencial) filtram só por
+// imposto (qualquer coisa ainda não finalizada — comportamento antigo, bucket=null). Os NOVOS
+// cards de tarefa da aba Apurações (por analista) filtram também por status específico dentro
+// daquele imposto: 'apurar'|'conf'|'corr'|'fin'. As duas telas reaproveitam o mesmo par de
+// variáveis/função (fopFiltrarPorImposto) — só muda se um bucket é passado ou não.
+let fopFiltroImpBucket = null;
+// Ordem de exibição dos cards "por imposto" — mesma ordem já usada no painel de Obrigações do Gerencial
+const FOP_ORDEM_IMPOSTOS_CARD = ['pgdas','das_mei','icms','fundos','ipi','pis_cofins','iss','retidos','irpj_csll'];
 let fopFiltroTarefa = 'todos';
 let fopFiltroConf = 'disponivel_novo';
 let fopFiltroHist = 'todos';
@@ -9595,6 +10100,35 @@ async function fopSalvarChave(chave, valor){
     await sb.from('configuracoes').insert({chave, valor: JSON.stringify(valor)});
   } catch(e){ console.warn('fopSalvar Supabase:', chave, e.message); }
 }
+// Blobs organizados por "empresa_ano_mês" (fiscal_apur, fiscal_apur_acess, fiscal_prazos_internos,
+// contabil_apur, contabil_apur_acess) são editados aos poucos, o dia todo, por várias pessoas ao
+// mesmo tempo — e a aba de cada uma só carrega os dados UMA VEZ, no login (nunca atualiza sozinha).
+// Se simplesmente sobrescrevêssemos o banco com a cópia da memória de cada aba (como fopSalvarChave
+// faz), uma aba aberta há horas apagaria por cima qualquer apuração/prazo que outra pessoa tenha
+// cadastrado nesse meio-tempo (ex.: um mês inteiro "sumindo"/"zerando" sem ninguém ter apagado nada).
+// Por isso, antes de gravar, buscamos o que está salvo agora no banco e devolvemos pro objeto local
+// qualquer empresa/mês ou imposto que essa aba não tenha — só então salvamos. Se a busca falhar,
+// cai no comportamento antigo (salva só o que tem local) pra nunca travar o salvamento.
+async function fopSalvarChaveMesclada(chave, valorLocal){
+  try {
+    const { data } = await sb.from('configuracoes').select('valor').eq('chave', chave).maybeSingle();
+    if(data && data.valor){
+      const remoto = JSON.parse(data.valor);
+      if(remoto && typeof remoto==='object'){
+        Object.keys(remoto).forEach(mesKey=>{
+          if(!(mesKey in valorLocal)){
+            valorLocal[mesKey] = remoto[mesKey];
+          } else if(remoto[mesKey] && typeof remoto[mesKey]==='object' && valorLocal[mesKey] && typeof valorLocal[mesKey]==='object'){
+            Object.keys(remoto[mesKey]).forEach(impKey=>{
+              if(!(impKey in valorLocal[mesKey])) valorLocal[mesKey][impKey] = remoto[mesKey][impKey];
+            });
+          }
+        });
+      }
+    }
+  } catch(e){ /* não conseguiu buscar o remoto — segue e salva só o que tem local, como antes */ }
+  return fopSalvarChave(chave, valorLocal);
+}
 function fopSalvar() {
   // Salvar localmente como fallback imediato
   try { localStorage.setItem('fopApur', JSON.stringify(fopApur)); } catch(e){}
@@ -9614,21 +10148,23 @@ function fopSalvar() {
   try { localStorage.setItem('contApurAcess', JSON.stringify(contApurAcess)); } catch(e){}
   try { localStorage.setItem('contTempos', JSON.stringify(contTempos)); } catch(e){}
   // Salvar no Supabase para sincronizar com todos os usuários
-  fopSalvarChave('fiscal_apur', fopApur);
+  // (fiscal_apur, fiscal_apur_acess, fiscal_prazos_internos, contabil_apur e contabil_apur_acess usam
+  // a versão "mesclada" — ver fopSalvarChaveMesclada — pra não apagar dados de outras pessoas/abas)
+  fopSalvarChaveMesclada('fiscal_apur', fopApur);
   fopSalvarChave('fiscal_tarefas', fopTarefas);
   fopSalvarChave('fiscal_historico', fopHistorico);
   fopSalvarChave('fiscal_partic', fopParticOverride);
   fopSalvarChave('fiscal_configs', fopFiscalConfigs);
-  fopSalvarChave('fiscal_prazos_internos', fopPrazosInternos);
+  fopSalvarChaveMesclada('fiscal_prazos_internos', fopPrazosInternos);
   fopSalvarChave('fiscal_colaboradores', fopColaboradores);
   fopSalvarChave('fiscal_vencimentos_manuais', fopVencimentosManuais);
-  fopSalvarChave('fiscal_apur_acess', fopApurAcess);
+  fopSalvarChaveMesclada('fiscal_apur_acess', fopApurAcess);
   fopSalvarChave('fiscal_tempos', fopTempos);
   fopSalvarChave('contabil_configs', contConfigs);
   fopSalvarChave('contabil_colaboradores', contColaboradores);
   fopSalvarChave('contabil_checklists', contChkLista);
-  fopSalvarChave('contabil_apur', contApur);
-  fopSalvarChave('contabil_apur_acess', contApurAcess);
+  fopSalvarChaveMesclada('contabil_apur', contApur);
+  fopSalvarChaveMesclada('contabil_apur_acess', contApurAcess);
   fopSalvarChave('contabil_tempos', contTempos);
   // Snapshot enxuto (cnpj, nome, responsável, tributação, inscrição estadual) de toda empresa
   // ativa — usado só pelo robô de e-mail diário (netlify/functions/daily-email.js), que roda no
@@ -9730,21 +10266,50 @@ function fiscalAtualizarPillsMes(mes) {
     p.classList.toggle('active', parseInt(p.dataset.mes)===mes);
   });
 }
+const FOP_MESES_NOMES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+// Diogo, 16/09/2026: "meu medo é a pessoa fazer em cima do mês errado, tipo começar a fazer
+// empresas competência de setembro no próprio mês de setembro" — competência é sempre o mês
+// que JÁ FECHOU (em setembro se apura agosto; setembro só fecha e começa a ser apurado em
+// outubro). Trava: analista não consegue nem entrar na competência do mês atual/futuro; só
+// quem já mexe na gestão fiscal (fopIsConferente — Nicolas/Marília/Diogo/Master ou conferente)
+// pode passar, com uma confirmação explícita, pra casos excepcionais (adiantar cadastro, etc.).
+function fiscalMesEhFuturo(mes){ return mes >= new Date().getMonth(); }
 function fiscalSelecionarMes(mes) {
+  if(fiscalMesEhFuturo(mes)){
+    const mesAtualReal=new Date().getMonth();
+    const ehMesAtual=mes===mesAtualReal;
+    const podeForcar=typeof fopIsConferente==='function' && fopIsConferente();
+    if(!podeForcar){
+      mostrarToast(`🔒 ${FOP_MESES_NOMES[mes]} ${ehMesAtual?'ainda não fechou':'ainda nem começou'} — a competência de ${FOP_MESES_NOMES[mes]} só abre a partir de ${FOP_MESES_NOMES[(mes+1)%12]}. Precisa mesmo? Fale com a gestão.`);
+      return;
+    }
+    const aviso=ehMesAtual
+      ? `Atenção: ainda estamos em ${FOP_MESES_NOMES[mes]} — o mês não fechou, o movimento pode estar incompleto. Quer entrar mesmo assim na competência de ${FOP_MESES_NOMES[mes]}?`
+      : `Atenção: ${FOP_MESES_NOMES[mes]} ainda nem começou. Quer entrar mesmo assim nessa competência?`;
+    if(!confirm(aviso)) return;
+  }
   const sel=document.getElementById('fiscal-mes-select');
   if(sel) sel.value=mes;
   fiscalAtualizarPillsMes(mes);
   const subAtiva=document.querySelector('#page-fiscal .fsub.active');
   const tabAtiva=subAtiva?subAtiva.id.replace('fsub-',''):'apuracoes';
   if(tabAtiva==='acessorias') renderFiscalTableAcess();
+  else if(tabAtiva==='gerencial'){
+    // Dashboard Fiscal (Visão Geral) ou Metas Internas — reaproveita o mesmo dispatcher de
+    // sub-aba do Gerencial, só descobrindo qual das duas está ativa no momento.
+    const gerSubAtiva=document.getElementById('gtab-visao')?.classList.contains('active')?'visao':'metas';
+    fopGerencialTab(gerSubAtiva);
+  }
   else renderFiscalTable();
 }
-// Ao carregar a página, o Fiscal sempre abre no mês ATUAL de verdade (não fica preso em
-// um mês fixo digitado no código) — só corrige o valor guardado, quem decide o que mostrar
-// na tela é renderFiscalTable()/renderFiscalTableAcess(), chamadas quando o usuário entra no módulo.
+// Ao carregar a página, o Fiscal sempre abre na competência que normalmente está sendo
+// trabalhada — o mês ANTERIOR ao mês real (ex: em setembro, abre já em agosto), nunca no mês
+// atual (que ainda não fechou). Isso evita o erro mais comum: alguém entrar e já começar a
+// apurar sem perceber que está na competência errada.
 window.addEventListener('load', ()=>{
   const sel=document.getElementById('fiscal-mes-select');
-  if(sel){ sel.value=new Date().getMonth(); fiscalAtualizarPillsMes(new Date().getMonth()); }
+  const mesCompetenciaPadrao=(new Date().getMonth()+11)%12; // mês anterior, com volta de Jan pra Dez
+  if(sel){ sel.value=mesCompetenciaPadrao; fiscalAtualizarPillsMes(mesCompetenciaPadrao); }
 });
 function fopGetKey(cnpj) { const m=String(fopGetMes()+1).padStart(2,'0'); return `${cnpj}_${new Date().getFullYear()}_${m}`; }
 // fam='acess' lê/escreve em fopApurAcess (aba "Obrigações Acessórias") em vez de fopApur (aba "Apurações").
@@ -9790,13 +10355,6 @@ function fopClassificarEmpresaAcess(c){
   const todosProntos=naoNa.every(s=>s==='disponivel'||s==='aprovado'||s==='finalizado');
   if(todosProntos) return 'disponivel';
   return 'apurando';
-}
-function fopEmpresaProntaConferencia(c){
-  const apur=fopGetApur(c.cnpj);
-  return fopGetImpostos(c).every(i=>{
-    const st=(apur[i]||{}).status||'';
-    return st==='na'||st==='disponivel'||st==='aprovado'||st==='finalizado';
-  });
 }
 
 // Ordem canônica das 9 obrigações "do mês" configuráveis por empresa (mesma ordem usada na
@@ -9878,12 +10436,20 @@ function fiscalTab(tab, el) {
   if(el) el.classList.add('active');
   const sub=document.getElementById('fsub-'+tab);
   if(sub) sub.classList.add('active');
-  const kpi=document.getElementById('fiscal-kpi-strip');
-  if(kpi) kpi.style.display=tab==='apuracoes'?'':'none';
+  // fiscal-kpi-strip/fiscal-imposto-cards moraram pro Dashboard Fiscal dentro de Gerencial
+  // (ver comentário lá) — não pertencem mais à árvore de Apurações, então não têm mais toggle
+  // aqui. Quem controla a visibilidade deles agora é só o próprio fsub-gerencial/gerencial-visao.
+  const tarStrip=document.getElementById('fiscal-tarefas-strip');
+  if(tarStrip) tarStrip.style.display=tab==='apuracoes'?'':'none';
+  const resumoStrip=document.getElementById('fiscal-resumo-strip');
+  if(resumoStrip) resumoStrip.style.display=tab==='apuracoes'?'':'none';
   const tr=document.getElementById('fiscal-topbar-right');
   if(tr) tr.style.display=tab==='apuracoes'?'':'none';
   const mt=document.getElementById('fiscal-mes-tabs');
-  if(mt) mt.style.display=(tab==='apuracoes'||tab==='acessorias')?'flex':'none';
+  // Diogo, 16/09/2026: "na parte gerencial acrescentar os meses também pra eu filtrar o mês que
+  // quero, tipo que tem em Apurações" — o Dashboard Fiscal (dentro de Gerencial) também precisa
+  // do seletor de mês, senão fica preso sempre no mês atual.
+  if(mt) mt.style.display=(tab==='apuracoes'||tab==='acessorias'||tab==='gerencial')?'flex':'none';
   if((tab==='conferencia'||tab==='finalizados'||tab==='historico'||tab==='tarefas'||tab==='configfiscal'||tab==='gerencial')&&!fopIsConferente()){
     mostrarToast('🔒 Acesso restrito — somente conferentes');
     const apurNav=document.querySelector(".fsnav[onclick*=\"fiscalTab('apuracoes'\"]");
@@ -10210,6 +10776,25 @@ function contSeedColaboradoresSeNecessario(){
 }
 
 // Cadastro de Colaboradores Contábeis — modal simples de adicionar/ativar-desativar/remover/renomear
+// "🗑️ Limpar dados de teste" do Contábil — igual ao fopLimparDadosTeste() do Fiscal: apaga só o
+// que foi PREENCHIDO usando o módulo (apuração mensal marcada, obrigações acessórias, cronômetro),
+// mantendo a configuração de cada empresa (responsável, checklists escolhidos) e a biblioteca de
+// checklists intactas — não faz sentido o Diogo/Marília terem que reconfigurar tudo de novo só pra
+// limpar o que foi clicado durante os testes. Botão só aparece pra quem contPodeLimparTeste() libera.
+function contLimparDadosTeste(){
+  if(!contPodeLimparTeste()){ mostrarToast('🔒 Apenas Diogo e Marília podem limpar os dados de teste'); return; }
+  const ok1=confirm('Isso vai APAGAR toda a apuração mensal marcada, obrigações acessórias e cronômetros do Contábil, deixando todas as empresas como "Não iniciado" novamente.\n\nAs configurações de cada empresa (responsável, checklists escolhidos) e a biblioteca de checklists NÃO serão apagadas.\n\nEsta ação não pode ser desfeita. Continuar?');
+  if(!ok1) return;
+  const ok2=confirm('Tem certeza? Todo o checklist mensal preenchido e as obrigações acessórias marcadas serão perdidos.');
+  if(!ok2) return;
+  contApur={};
+  contApurAcess={};
+  contTempos={ativos:{},registros:[]};
+  fopSalvar();
+  mostrarToast('🗑️ Dados de teste do Contábil apagados — recarregando...');
+  setTimeout(()=>location.reload(),800);
+}
+
 function contAbrirColaboradores(){
   contSeedColaboradoresSeNecessario();
   contColaboradorEditandoId = null;
@@ -11591,7 +12176,7 @@ function fiscalRenderGrid(lista){
     const _classe=fopClassificarEmpresa(c);
     const _ci=FOP_CLASSE_INFO[_classe]||FOP_CLASSE_INFO.apurando;
     const _totalRot=imps.length;
-    const _doneRot=imps.filter(imp=>{const st=(apur[imp]||{}).status||''; return st==='finalizado'||st==='na';}).length;
+    const _doneRot=imps.filter(imp=>{const st=(apur[imp]||{}).status||''; return st==='finalizado'||st==='na'||st==='aprovado';}).length; // 'aprovado' já é trabalho concluído do analista — só falta o envio em lote ao cliente
     let _pt=(fopParticOverride[c.cnpj]!==undefined?fopParticOverride[c.cnpj]:(c.particularidades||'')).trim();
     if(_pt==='-') _pt='';
     return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
@@ -11617,6 +12202,7 @@ function fiscalRenderGrid(lista){
   }).join('');
 }
 function renderFiscalTable() {
+  fopMigrarAprovadosParaFinalizado();
   const mes=fopGetMes();
   const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const lbl=document.getElementById('fiscal-mes-label');
@@ -11643,7 +12229,10 @@ function renderFiscalTable() {
   // de KPI logo abaixo, assim os cards sempre batem com o que está filtrado na tela
   // (ex: filtrar só "Simples Nacional" faz o card "Total de Empresas" mostrar só essas
   // 10, em vez de continuar somando as 30 da base inteira do usuário).
-  const _baseFiltrada=_baseResp.filter(c=>{
+  // _baseSemImp = filtros de regime/responsável/busca/status, SEM o filtro por imposto — é a base
+  // usada pros cards "por imposto" (fiscal-imposto-cards), pra cada um mostrar seu total real e
+  // independente, mesmo quando outro imposto já está selecionado como filtro da tabela.
+  const _baseSemImp=_baseResp.filter(c=>{
     if(fopFiltroRegime2!=='todos'){
       const tl=(c.tributacao||'').toLowerCase();
       if(fopFiltroRegime2==='Simples Nacional'&&!tl.includes('simples')) return false;
@@ -11662,41 +12251,139 @@ function renderFiscalTable() {
     }
     return true;
   });
+  // _baseFiltrada = _baseSemImp + o filtro por imposto (quando um card tipo "ICMS" está selecionado) —
+  // esta é a base que alimenta a tabela/grade e os KPIs de empresas (Total, A Apurar etc.)
+  const _baseFiltrada=_baseSemImp.filter(c=>{
+    if(fopFiltroImposto){
+      if(c.pendente) return false;
+      if(!fopGetImpostos(c).includes(fopFiltroImposto)) return false; // empresa nem tem esse imposto (equivale a 'na')
+      const apur=fopGetApur(c.cnpj);
+      const st=(apur[fopFiltroImposto]||{}).status||'';
+      if(fopFiltroImpBucket){
+        // Filtro por status específico (clique num card de tarefa da Apurações: A Apurar/
+        // Conferência/Correção/Finalizado) — mesmo balde usado nos cards (resumoTarefa acima).
+        const bucket=st==='finalizado'?'fin':st==='correcao'?'corr':st==='disponivel'?'conf':'apurar';
+        if(bucket!==fopFiltroImpBucket) return false;
+      } else if(st==='finalizado') return false; // clique vindo do Dashboard Fiscal (Gerencial): "ainda falta", sem bucket específico
+    }
+    return true;
+  });
 
   // empresas sem configuração fiscal ficam só na aba "Configuração Fiscal" — nunca na grade
   let lista=_baseFiltrada.filter(c=>!c.pendente);
 
   fiscalRenderGrid(lista);
 
-  // KPIs — cada empresa cai em EXATAMENTE 1 balde (mutuamente exclusivo),
-  // assim os numeros sempre somam certo e saem do balde anterior corretamente.
-  // Usa _baseFiltrada (não a base inteira) pra os cards seguirem os filtros ativos.
-  let kTot=0,kFin=0,kApur=0,kCorr=0,kDisp=0,kSem=0,kPend=0,kRotina=0,kFinalizarRotina=0;
-  _baseFiltrada.forEach(c=>{
-    kTot++;
-    if(c.pendente){ kApur++; kPend++; return; }
+  // Badges de navegação + Resumo "Minhas empresas" — Diogo, 16/09/2026: "eu quero também um
+  // card do total de empresas que esse colaborador tem... tenho X empresas sob o meu cuidado,
+  // e aí aparece os status dessa empresa... 100 empresas, 100 a apurar, 100 em correção, 100
+  // finalizadas". Mesma classificação POR EMPRESA (fopClassificarEmpresa) do Dashboard Fiscal
+  // (Gerencial), só que aqui usa _baseSemImp — que já é a base do usuário logado (_baseResp)
+  // com os filtros de regime/busca/status por cima. Pra quem tem fiscalResp (analista), isso já
+  // é "só as minhas empresas"; pra gestor/conferente (fiscalResp vazio), é a base inteira.
+  let kPend=0, kDispItens=0;
+  let rTot=0,rFin=0,rApur=0,rCorr=0,rSem=0,rRotina=0,rFinalizarRotina=0,rConf=0;
+  _baseSemImp.forEach(c=>{
+    if(c.pendente){ kPend++; return; }
+    rTot++;
     const apur=fopGetApur(c.cnpj);
     const imps=fopGetImpostos(c);
     const sts=imps.map(i=>(apur[i]||{}).status||'');
+    kDispItens+=sts.filter(s=>s==='disponivel').length;
     const _classe=fopClassificarEmpresa(c);
-    if(_classe==='na'){ kSem++; }
-    else if(_classe==='correcao'){ kCorr++; kPend++; }
-    else if(_classe==='rotina_automatica'){ kRotina++; kPend++; }
-    else if(_classe==='conferencia_final'){ kFinalizarRotina++; kPend++; }
-    else if(_classe==='finalizado'){ kFin++; }
-    else if(_classe==='disponivel'){ kDisp++; kPend++; }
-    else { kApur++; kPend++; }
+    if(_classe!=='finalizado'&&_classe!=='na') kPend++;
+    if(_classe==='na') rSem++;
+    else if(_classe==='correcao') rCorr++;
+    else if(_classe==='rotina_automatica') rRotina++;
+    else if(_classe==='conferencia_final') rFinalizarRotina++;
+    else if(_classe==='finalizado') rFin++;
+    else if(_classe==='disponivel') rConf++;
+    else rApur++;
   });
-  ['fiscal-kpi-total','fiscal-kpi-concluidas','fiscal-kpi-apurando','fiscal-kpi-correcao','fiscal-kpi-disponivel','fiscal-kpi-semMov','fiscal-kpi-rotina','fiscal-kpi-finalizar-rotina']
-    .forEach((id,ix)=>{ const el=document.getElementById(id); if(el) el.textContent=[kTot,kFin,kApur,kCorr,kDisp,kSem,kRotina,kFinalizarRotina][ix]; });
-
   const _userRespBadge=(typeof usuarioLogado!=='undefined'&&usuarioLogado&&usuarioLogado.fiscalResp)||null;
   const pTar=fopTarefas.filter(t=>t.status!=='concluido'&&(!_userRespBadge||(t.responsavel||'').toUpperCase().includes(_userRespBadge.toUpperCase()))).length;
   const bt=document.getElementById('fiscal-badge-tarefas'); if(bt){const fbtN=document.getElementById('fbt-num');if(fbtN)fbtN.textContent=pTar;bt.style.display=pTar?'':'none';}
-  const bc=document.getElementById('fiscal-badge-conf'); if(bc){bc.textContent=kDisp;bc.style.display=kDisp?'':'none';}
+  const bc=document.getElementById('fiscal-badge-conf'); if(bc){bc.textContent=kDispItens;bc.style.display=kDispItens?'':'none';}
   const bfNav=document.getElementById('badge-fiscal'); if(bfNav){bfNav.textContent=kPend;bfNav.style.display=kPend>0?'inline':'none';}
   const kCfgPend=_baseResp.filter(c=>c.pendente).length;
   const bcfg=document.getElementById('fiscal-badge-cfg'); if(bcfg){bcfg.textContent=kCfgPend;bcfg.style.display=kCfgPend?'':'none';}
+
+  const tituloResumo=document.getElementById('fiscal-resumo-titulo');
+  if(tituloResumo) tituloResumo.textContent=_userResp?`📌 Minhas empresas (${_userResp})`:'📌 Empresas — todas';
+  ['fiscal-resumo-total','fiscal-resumo-finalizadas','fiscal-resumo-apurar','fiscal-resumo-correcao','fiscal-resumo-conferencia','fiscal-resumo-rotina','fiscal-resumo-finalizar-rotina']
+    .forEach((id,ix)=>{ const el=document.getElementById(id); if(el) el.textContent=[rTot,rFin,rApur,rCorr,rConf,rRotina,rFinalizarRotina][ix]; });
+
+  // Cards de TAREFA por imposto (aba Apurações = tela de trabalho do analista) — Diogo,
+  // 16/09/2026: "eu entrar com o usuário do Natan e visualizar... 80 PGDAS, 20 ICMS, 10
+  // PIS/COFINS... quando clicar nesses cards, aparecer as empresas que têm que fazer isso...
+  // conforme for finalizando, vai aparecendo lá empresas finalizadas e vai baixando do apurar."
+  // Usa _baseSemImp, que já vem filtrada pelo `respMes` do usuário logado (_baseResp) — então
+  // pra um analista com fiscalResp preenchido, isso já é só as empresas DELE, automaticamente.
+  // 3 números por imposto (confirmado com Diogo): A Apurar (nem começou/ainda apurando —
+  // inclui as etapas internas do PGDAS que ainda não voltaram pro responsável finalizar),
+  // Em Conferência (já mandou, esperando a Marília/Nicolas aprovarem) e Finalizado. Correção
+  // fica separada (badge própria no card), pra não confundir "nunca fiz" com "fiz e voltou".
+  const resumoTarefa={};
+  _baseSemImp.filter(c=>!c.pendente).forEach(c=>{
+    const apur=fopGetApur(c.cnpj);
+    fopGetImpostos(c).forEach(imp=>{
+      const st=(apur[imp]||{}).status||'';
+      if(st==='na') return;
+      if(!resumoTarefa[imp]) resumoTarefa[imp]={apurar:0,conf:0,corr:0,fin:0};
+      if(st==='finalizado') resumoTarefa[imp].fin++;
+      else if(st==='correcao') resumoTarefa[imp].corr++;
+      else if(st==='disponivel') resumoTarefa[imp].conf++;
+      else resumoTarefa[imp].apurar++; // '', 'apurando', 'rotina_automatica', 'conferencia_final'
+    });
+  });
+  const tituloTarefas=document.getElementById('fiscal-tarefas-titulo');
+  if(tituloTarefas) tituloTarefas.textContent=_userResp?`📋 Minhas apurações, por imposto (${_userResp})`:'📋 Apurações por imposto — todas as empresas';
+  const elTar=document.getElementById('fiscal-tarefas-cards');
+  if(elTar){
+    const linhasTar=FOP_ORDEM_IMPOSTOS_CARD.filter(imp=>{
+      const d=resumoTarefa[imp];
+      return d&&(d.apurar+d.conf+d.corr+d.fin)>0;
+    });
+    if(!linhasTar.length){
+      elTar.innerHTML='<div style="font-size:11.5px;color:var(--text-muted);padding:6px 0;grid-column:1/-1;">Nenhuma empresa aqui — configure as empresas em "Configuração Fiscal".</div>';
+    } else {
+      elTar.innerHTML=linhasTar.map(imp=>{
+        const d=resumoTarefa[imp];
+        const ativoApurar=fopFiltroImposto===imp&&fopFiltroImpBucket==='apurar';
+        const ativoConf=fopFiltroImposto===imp&&fopFiltroImpBucket==='conf';
+        const ativoFin=fopFiltroImposto===imp&&fopFiltroImpBucket==='fin';
+        return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:9px 11px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px;">
+            <div style="font-weight:800;font-size:11.5px;">${FOP_LABELS[imp]||imp}</div>
+            ${d.corr>0?`<div onclick="fopFiltrarPorImposto('${imp}','corr')" title="Empresas que voltaram pra correção" style="cursor:pointer;font-size:9px;font-weight:700;color:var(--red);background:rgba(255,92,122,.12);padding:1px 6px;border-radius:20px;white-space:nowrap;">🔴 ${d.corr} correção</div>`:''}
+          </div>
+          <div style="display:flex;gap:6px;">
+            <div onclick="fopFiltrarPorImposto('${imp}','apurar')" title="Ainda falta apurar" style="cursor:pointer;flex:1;text-align:center;background:${ativoApurar?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoApurar?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
+              <div style="font-size:15px;font-weight:800;color:var(--yellow);line-height:1;">${d.apurar}</div>
+              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;">⏳ A Apurar</div>
+            </div>
+            <div onclick="fopFiltrarPorImposto('${imp}','conf')" title="Aguardando aprovação da conferência" style="cursor:pointer;flex:1;text-align:center;background:${ativoConf?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoConf?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
+              <div style="font-size:15px;font-weight:800;color:var(--cyan);line-height:1;">${d.conf}</div>
+              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;">🔍 Conferência</div>
+            </div>
+            <div onclick="fopFiltrarPorImposto('${imp}','fin')" title="Já finalizadas" style="cursor:pointer;flex:1;text-align:center;background:${ativoFin?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoFin?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
+              <div style="font-size:15px;font-weight:800;color:var(--green);line-height:1;">${d.fin}</div>
+              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;">✅ Finalizado</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+  const _tfAtivo=document.getElementById('fiscal-tarefas-filtro-ativo');
+  if(_tfAtivo){
+    _tfAtivo.style.display=fopFiltroImposto?'':'none';
+    const _tfNome=document.getElementById('fiscal-tarefas-filtro-nome');
+    if(_tfNome){
+      const _bucketLbl={apurar:'a apurar',conf:'em conferência',corr:'em correção',fin:'finalizado'}[fopFiltroImpBucket]||'pendente';
+      _tfNome.textContent=`${FOP_LABELS[fopFiltroImposto]||fopFiltroImposto} (${_bucketLbl})`;
+    }
+  }
 
   const thead=document.getElementById('fiscal-thead');
   const tbody=document.getElementById('fiscal-tbody');
@@ -11733,7 +12420,7 @@ function renderFiscalTable() {
     const _classe=fopClassificarEmpresa(c);
     const _ci=FOP_CLASSE_INFO[_classe]||FOP_CLASSE_INFO.apurando;
     const _totalRot=imps.length;
-    const _doneRot=imps.filter(imp=>{const st=(apur[imp]||{}).status||''; return st==='finalizado'||st==='na';}).length;
+    const _doneRot=imps.filter(imp=>{const st=(apur[imp]||{}).status||''; return st==='finalizado'||st==='na'||st==='aprovado';}).length; // 'aprovado' já é trabalho concluído do analista — só falta o envio em lote ao cliente
     const rotinasCell=`<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;">
       <button class="frot-btn" onclick="event.stopPropagation();fopAbrirRotinas('${c.cnpj}')" title="${_ci.label} · ${_doneRot}/${_totalRot} rotinas concluídas">
         <span class="fdot" style="background:${_ci.color};color:${_ci.color};"></span>
@@ -12060,6 +12747,18 @@ function fopAbrirFinalizadosCard(){
   else fopKpiFiltrar('finalizado');
 }
 
+function fopFiltrarPorImposto(imp, bucket){
+  // Usada tanto pelas linhas do Dashboard Fiscal (Gerencial → Visão Geral, sem bucket — "ainda
+  // falta esse imposto") quanto pelos cards de tarefa da Apurações (com bucket — 'apurar'/
+  // 'conf'/'corr'/'fin', um status específico). Clicar de novo no mesmo imp+bucket limpa o
+  // filtro. Sempre navega pra Apurações, que é onde a lista de empresas filtrada aparece —
+  // clicando a partir do Gerencial, o usuário já cai vendo o resultado.
+  bucket=bucket||null;
+  if(!imp||(fopFiltroImposto===imp&&fopFiltroImpBucket===bucket)){ fopFiltroImposto=null; fopFiltroImpBucket=null; }
+  else { fopFiltroImposto=imp; fopFiltroImpBucket=bucket; }
+  const apurNav=document.querySelector(".fsnav[onclick*=\"fiscalTab('apuracoes'\"]");
+  fiscalTab('apuracoes', apurNav); // já chama renderFiscalTable()
+}
 function fopKpiFiltrar(status){
   if(status==='correcao'&&!fopIsConferente()){
     const tarNav=document.querySelector(".fsnav[onclick*=\"fiscalTab('tarefas'\"]");
@@ -12529,6 +13228,7 @@ function fopAbrirModal(cnpj, imposto, fam){
   }
   if(imposto==='icms'&&temTTD&&!items.includes('Conferência Benefício Fiscal TTD 409')) items.splice(10,0,'Conferência Benefício Fiscal TTD 409');
   while(d.checklist.length<items.length) d.checklist.push(false);
+  const _fopChkCount=fopChecklistCount(items, d.checklist);
 
   const cfg=FOP_STATUS[d.status]||FOP_STATUS[''];
   const isDisp=d.status==='disponivel';
@@ -12604,7 +13304,7 @@ function fopAbrirModal(cnpj, imposto, fam){
           <button onclick="fopIniciarTempo('${cnpj}','${imposto}','${fam||''}')" style="padding:9px 14px;border-radius:8px;background:rgba(0,200,150,.15);border:1px solid rgba(0,200,150,.3);color:var(--green);font-weight:700;cursor:pointer;font-size:12.5px;white-space:nowrap;">▶ Iniciar Apuração</button>
         </div>`;
       })()}
-      ${items.length?`<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Checklist (${d.checklist.filter(v=>v).length}/${items.length})</div>${!_cronOk?`<div style="font-size:11px;color:var(--yellow);margin-bottom:8px;">🔒 ${fopTempoAtivo(cnpj,imposto,fam)?'Cronômetro pausado — clique em "▶ Retomar" acima':'Inicie o cronômetro acima antes de marcar o checklist'}</div>`:''}${ckHtml}<div style="height:14px;"></div>`:''}
+      ${items.length?`<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Checklist (${_fopChkCount.done}/${_fopChkCount.total})</div>${!_cronOk?`<div style="font-size:11px;color:var(--yellow);margin-bottom:8px;">🔒 ${fopTempoAtivo(cnpj,imposto,fam)?'Cronômetro pausado — clique em "▶ Retomar" acima':'Inicie o cronômetro acima antes de marcar o checklist'}</div>`:''}${ckHtml}<div style="height:14px;"></div>`:''}
       <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Observações</div>
       <textarea id="fop-obs-${cnpj}-${imposto}" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--text-primary);outline:none;resize:vertical;min-height:56px;">${d.obs||''}</textarea>
       ${!isAcess&&isDisp&&fopIsConferente()?`<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
@@ -12650,8 +13350,9 @@ function fopAbrirRotinas(cnpj, fam){
     const cfg=FOP_STATUS[st]||FOP_STATUS[''];
     let items=imp==='pgdas'?[...fopPgdasItems(d)]:[...(FOP_CHECKLISTS[imp]||[])];
     if(imp==='icms'&&temTTD&&!items.includes('Conferência Benefício Fiscal TTD 409')) items.splice(10,0,'Conferência Benefício Fiscal TTD 409');
-    const done=(d.checklist||[]).filter(v=>v).length;
-    const pct=items.length?Math.round(done/items.length*100):0;
+    const _cc=fopChecklistCount(items, d.checklist);
+    const done=_cc.done;
+    const pct=_cc.total?Math.round(done/_cc.total*100):0;
     const _restritaRotina=imp==='pgdas'&&d.etapa===2&&!fopIsRotinaAutomatica();
     const _bloqueada=(imp==='conferencia'&&!fopIsConferente())||_restritaRotina;
     const _click=_bloqueada?'':`document.getElementById('modal-rotinas').classList.remove('open');fopAbrirModal('${cnpj}','${imp}','${fam||''}')`;
@@ -12876,6 +13577,11 @@ function fopMarcarTodosConf(cnpj,imposto){
 }
 
 function fopAprovar(cnpj, imposto){
+  // Diogo, 16/09/2026: "Quando a Marília ou o Nicolas aprovar, ele já vai para finalizados.
+  // Não tem como ir para uma aba enviar o cliente" — removida a etapa intermediária "Aprovado
+  // (aguard. envio)"/"📤 Enviar ao Cliente": aprovar UM imposto agora já finaliza ELE MESMO na
+  // hora, sem esperar os demais impostos da mesma empresa (mesma independência por item que já
+  // vale pra entrada na fila de conferência).
   if(!fopIsConferente()){ mostrarToast('🔒 Apenas conferentes podem aprovar'); return; }
   const _aChk=fopGetApur(cnpj);
   if(!CONF_CHECKLIST.every((_,i)=>((_aChk[imposto]||{}).chkConf||[])[i])){
@@ -12885,51 +13591,15 @@ function fopAprovar(cnpj, imposto){
   if(!empresa){ mostrarToast('❌ Empresa não encontrada'); return; }
   const apur=fopGetApur(cnpj);
   if(!apur[imposto]) return;
-  apur[imposto].status='aprovado';
+  apur[imposto].status='finalizado';
   apur[imposto].confBy=fopGetUsuario();
-  fopLog(empresa?.nome||cnpj,cnpj,imposto,'Aprovado',`Conferente: ${fopGetUsuario()}`);
+  apur[imposto].tsFim=new Date().toISOString();
+  fopLog(empresa?.nome||cnpj,cnpj,imposto,'Aprovado e Finalizado',`Conferente: ${fopGetUsuario()}`);
   fopSalvar();
   document.getElementById('modal-fop')?.classList.remove('open');
-  // Conforme fluxo: se todos os impostos da empresa ja estiverem aprovados, finaliza automaticamente
-  const imps=fopGetImpostos(empresa);
-  const pendentes=imps.filter(i=>{
-    const st=(apur[i]||{}).status||'';
-    return st!=='aprovado'&&st!=='na';
-  });
-  if(pendentes.length===0){
-    fopEnviarCliente(cnpj);
-  } else {
-    renderFiscalTable();
-    fopRenderConferencia();
-    alert(`✅ ${FOP_LABELS[imposto]} aprovado!\n\n⏳ Esta empresa ainda NÃO foi finalizada — faltam aprovar:\n${pendentes.map(i=>'• '+(FOP_LABELS[i]||i)).join('\n')}\n\nVeja a aba "🟣 Aguardando Envio" para acompanhar.`);
-  }
-}
-
-function fopEnviarCliente(cnpj){
-  if(!fopIsConferente()){ mostrarToast('🔒 Apenas conferentes podem enviar ao cliente'); return; }
-  const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
-  if(!empresa) return;
-  const apur=fopGetApur(cnpj);
-  const imps=fopGetImpostos(empresa);
-  const pendentes=imps.filter(i=>{
-    const st=(apur[i]||{}).status||'';
-    return st!=='aprovado'&&st!=='na';
-  });
-  if(pendentes.length){
-    alert('Ainda há impostos pendentes de aprovação: '+pendentes.map(i=>FOP_LABELS[i]||i).join(', '));
-    return;
-  }
-  imps.forEach(i=>{
-    if(apur[i]&&apur[i].status==='aprovado'){
-      apur[i].status='finalizado';
-      apur[i].tsFim=new Date().toISOString();
-    }
-  });
-  fopLog(empresa.nome,cnpj,'—','Enviado ao Cliente',`Por: ${fopGetUsuario()}`);
-  fopSalvar();
   renderFiscalTable();
   fopRenderConferencia();
-  mostrarToast(`📤 ${empresa.nome} — todas as obrigações enviadas ao cliente!`);
+  mostrarToast(`✅ ${FOP_LABELS[imposto]||imposto} de ${empresa.nome} aprovado e finalizado!`);
   celebrarConclusao();
 }
 
@@ -13116,36 +13786,6 @@ function fopRenderConferencia(){
     return;
   }
 
-  if(fopFiltroConf==='aprovado'){
-    // fopBuildClientes() (não o FISCAL_CLIENTES_BASE cru) — senão uma empresa com configuração
-    // salva em "⚙️ Configurar" (responsável, obrigações etc.) ficava com dado desatualizado aqui
-    // e podia até desaparecer da lista mesmo contando no card "Em Conferência".
-    const base=fopBuildClientes().filter(c=>!c.pendente);
-    const empresas=base.filter(c=>{
-      const apur=fopGetApur(c.cnpj);
-      return fopGetImpostos(c).some(i=>(apur[i]||{}).status==='aprovado');
-    });
-    if(!empresas.length){ el.innerHTML=`<div style="text-align:center;padding:40px;color:var(--text-muted);">Nenhuma empresa aguardando envio</div>`; return; }
-    el.innerHTML=empresas.map(c=>{
-      const apur=fopGetApur(c.cnpj);
-      const imps=fopGetImpostos(c);
-      const pendentes=imps.filter(i=>{const st=(apur[i]||{}).status||'';return st!=='aprovado'&&st!=='na';});
-      const pronto=pendentes.length===0;
-      return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text-primary);">${c.nome}</div>
-          <div style="font-size:11.5px;color:var(--text-muted);margin-top:3px;">${fopFmtCNPJ(c.cnpj)} · Resp: ${c.respMes||'—'}</div>
-          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">
-            ${imps.map(i=>{const st=(apur[i]||{}).status||'';const cfg=FOP_STATUS[st]||FOP_STATUS[''];return `<span title="${FOP_LABELS[i]||i}: ${cfg.label}" style="font-size:10px;padding:2px 6px;border-radius:5px;background:var(--bg-card-hover);border:1px solid var(--border);">${cfg.icon} ${FOP_LABELS[i]||i}</span>`;}).join('')}
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;flex-shrink:0;">
-          ${fopIsConferente()?`<button onclick="fopEnviarCliente('${c.cnpj}')" ${pronto?'':'disabled'} style="padding:9px 16px;border-radius:8px;background:${pronto?'rgba(124,77,255,.18)':'var(--bg-card-hover)'};border:1px solid ${pronto?'rgba(124,77,255,.4)':'var(--border)'};color:${pronto?'#a78bfa':'var(--text-muted)'};font-weight:700;cursor:${pronto?'pointer':'not-allowed'};font-size:12.5px;">📤 Enviar ao Cliente</button>`:''}
-        </div>
-      </div>`;
-    }).join('');
-    return;
-  }
 
   let itens=[];
   fopBuildClientes().filter(c=>!c.pendente).forEach(c=>{
@@ -13153,8 +13793,12 @@ function fopRenderConferencia(){
     fopGetImpostos(c).forEach(imp=>{
       const d=apur[imp]||{};
       let _match;
-      if(fopFiltroConf==='disponivel_novo') _match=d.status==='disponivel'&&!(d.qtdCorrecoes>0)&&fopEmpresaProntaConferencia(c);
-      else if(fopFiltroConf==='disponivel_retorno') _match=d.status==='disponivel'&&d.qtdCorrecoes>0&&fopEmpresaProntaConferencia(c);
+      // Antes exigia TODOS os impostos da empresa prontos (fopEmpresaProntaConferencia) pra
+      // qualquer um aparecer aqui — isso travava o ICMS (vencimento no início do mês) esperando
+      // PIS/COFINS (vencimento no fim do mês). Agora cada obrigação entra na fila assim que ELA
+      // MESMA estiver pronta, independente das demais — igual ao Contábil (contRenderConferencia).
+      if(fopFiltroConf==='disponivel_novo') _match=d.status==='disponivel'&&!(d.qtdCorrecoes>0);
+      else if(fopFiltroConf==='disponivel_retorno') _match=d.status==='disponivel'&&d.qtdCorrecoes>0;
       else _match=d.status===fopFiltroConf;
       if(_match) itens.push({c,imp,d});
     });
@@ -13176,8 +13820,9 @@ function fopRenderConferencia(){
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;align-items:start;">
         ${obrigs.map(({imp,d})=>{
           const items=FOP_CHECKLISTS[imp]||[];
-          const done=(d.checklist||[]).filter(v=>v).length;
-          const pct=items.length?Math.round(done/items.length*100):100;
+          const _chkCnt=fopChecklistCount(items, d.checklist);
+          const done=_chkCnt.done;
+          const pct=_chkCnt.total?Math.round(done/_chkCnt.total*100):100;
           const _cc=(d.chkConf||[]);
           const _ok=CONF_CHECKLIST.every((_,i)=>_cc[i]);
           const _key=c.cnpj+'|'+imp;
@@ -13276,6 +13921,103 @@ function fopRenderGerencial(){
   const _ehGestor = _u==='DIOGO'||_u==='MASTER'||_u==='MARILIA'||_u==='NICOLAS';
   // Colaboradores não têm acesso a esta aba
   if(!_ehGestor){ mostrarToast('🔒 Acesso restrito à gestão'); return; }
+
+  // Diogo, 16/09/2026: "na parte gerencial acrescentar os meses também pra eu filtrar o mês que
+  // quero, tipo que tem em Apurações" — o Dashboard Fiscal olha pra fopGetApur(), que já é
+  // guardado por mês (fopGetKey usa fopGetMes()); só faltava o label/pills do topo acompanharem
+  // quando o mês é trocado enquanto essa aba está aberta (ver fiscalSelecionarMes).
+  const _gerMes=fopGetMes();
+  const _gerMESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const _gerLbl=document.getElementById('fiscal-mes-label');
+  if(_gerLbl) _gerLbl.textContent=_gerMESES[_gerMes]+' '+new Date().getFullYear();
+  fiscalAtualizarPillsMes(_gerMes);
+
+  fopMigrarAprovadosParaFinalizado();
+
+  // ── Dashboard Fiscal — Diogo, 16/09/2026: "essa tela a gente pode chamar ela de dashboard
+  // fiscal... quem vai ter acesso a essa tela? Eu, Diogo, Marília e Nicolas" — os cards gerais
+  // (empresa inteira) e as linhas por imposto que antes ficavam na aba Apurações moraram pra cá.
+  // SEMPRE olha TODAS as empresas (fopBuildClientes() puro, sem filtrar por quem está logado) —
+  // diferente da aba Apurações, que agora é o painel de trabalho pessoal do analista.
+  const _gerTodas=fopBuildClientes().filter(c=>!c.pendente);
+  let gkTot=0,gkFin=0,gkApur=0,gkCorr=0,gkDispItens=0,gkSem=0,gkRotina=0,gkFinalizarRotina=0;
+  _gerTodas.forEach(c=>{
+    gkTot++;
+    const apur=fopGetApur(c.cnpj);
+    const imps=fopGetImpostos(c);
+    const sts=imps.map(i=>(apur[i]||{}).status||'');
+    gkDispItens+=sts.filter(s=>s==='disponivel').length;
+    const _classe=fopClassificarEmpresa(c);
+    if(_classe==='na') gkSem++;
+    else if(_classe==='correcao') gkCorr++;
+    else if(_classe==='rotina_automatica') gkRotina++;
+    else if(_classe==='conferencia_final') gkFinalizarRotina++;
+    else if(_classe==='finalizado') gkFin++;
+    else gkApur++;
+  });
+  ['fiscal-kpi-total','fiscal-kpi-concluidas','fiscal-kpi-apurando','fiscal-kpi-correcao','fiscal-kpi-disponivel','fiscal-kpi-semMov','fiscal-kpi-rotina','fiscal-kpi-finalizar-rotina']
+    .forEach((id,ix)=>{ const el=document.getElementById(id); if(el) el.textContent=[gkTot,gkFin,gkApur,gkCorr,gkDispItens,gkSem,gkRotina,gkFinalizarRotina][ix]; });
+
+  // Linhas "por imposto" — total/a apurar/rotina automática (PGDAS)/finalizar rotina/conferência/
+  // correção/finalizado, igual ao detalhe que já existia, só que agora sempre com TODAS as
+  // empresas (visão gerencial), independente de quem estiver logado.
+  const resumoImp={};
+  _gerTodas.forEach(c=>{
+    const apur=fopGetApur(c.cnpj);
+    fopGetImpostos(c).forEach(imp=>{
+      const st=(apur[imp]||{}).status||'';
+      if(st==='na') return;
+      if(!resumoImp[imp]) resumoImp[imp]={total:0,apurar:0,rotina:0,finalizarRotina:0,conf:0,corr:0,fin:0};
+      resumoImp[imp].total++;
+      if(st==='finalizado') resumoImp[imp].fin++;
+      else if(st==='correcao') resumoImp[imp].corr++;
+      else if(st==='disponivel') resumoImp[imp].conf++;
+      else if(st==='rotina_automatica') resumoImp[imp].rotina++;
+      else if(st==='conferencia_final') resumoImp[imp].finalizarRotina++;
+      else resumoImp[imp].apurar++;
+    });
+  });
+  const elImp=document.getElementById('fiscal-imposto-cards');
+  if(elImp){
+    const linhasImp=FOP_ORDEM_IMPOSTOS_CARD.filter(imp=>resumoImp[imp]&&resumoImp[imp].total>0);
+    if(!linhasImp.length){
+      elImp.innerHTML='<div style="font-size:11.5px;color:var(--text-muted);padding:6px 0;">Nenhuma empresa configurada ainda.</div>';
+    } else {
+      elImp.innerHTML=linhasImp.map(imp=>{
+        const d=resumoImp[imp];
+        const ativo=fopFiltroImposto===imp&&!fopFiltroImpBucket;
+        const pctFin=d.total?Math.round(d.fin/d.total*100):0;
+        const corPct=pctFin===100?'var(--green)':pctFin>=60?'var(--yellow)':pctFin>=1?'var(--orange)':'var(--red)';
+        const segTotal=d.total||1;
+        const _temRotinaPgdas=imp==='pgdas'&&(d.rotina>0||d.finalizarRotina>0);
+        const segs=[
+          {v:d.apurar,c:'var(--yellow)'},
+          {v:d.rotina,c:'#a78bfa'},
+          {v:d.finalizarRotina,c:'#fb923c'},
+          {v:d.conf,c:'var(--cyan)'},
+          {v:d.corr,c:'var(--red)'},
+          {v:d.fin,c:'var(--green)'},
+        ];
+        const statBlocosPgdas=_temRotinaPgdas?`
+            <div style="min-width:56px;"><div style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">⚙️ Rotina Auto.</div><div style="font-size:15px;font-weight:800;color:#a78bfa;line-height:1;">${d.rotina}</div></div>
+            <div style="min-width:56px;"><div style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">📝 Finalizar Rotina</div><div style="font-size:15px;font-weight:800;color:#fb923c;line-height:1;">${d.finalizarRotina}</div></div>`:'';
+        return `<div onclick="fopFiltrarPorImposto('${imp}')" title="Clique pra ver, na aba Apurações, as empresas que ainda faltam entregar ${FOP_LABELS[imp]||imp}" style="cursor:pointer;display:flex;align-items:center;gap:0;background:${ativo?'var(--cyan-glow)':'var(--bg-card)'};border:1px solid ${ativo?'rgba(0,170,221,.45)':'var(--border)'};border-left:3px solid ${corPct};border-radius:10px;padding:9px 14px;transition:all .12s;flex-wrap:wrap;row-gap:8px;">
+          <div style="min-width:120px;font-weight:800;font-size:13px;color:${ativo?'var(--cyan)':'var(--text-primary)'};">${FOP_LABELS[imp]||imp}</div>
+          <div style="display:flex;gap:22px;flex:1;flex-wrap:wrap;">
+            <div style="min-width:56px;"><div style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">Total</div><div style="font-size:15px;font-weight:800;color:var(--text-primary);line-height:1;">${d.total}</div></div>
+            <div style="min-width:56px;"><div style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">⏳ A Apurar</div><div style="font-size:15px;font-weight:800;color:var(--yellow);line-height:1;">${d.apurar}</div></div>${statBlocosPgdas}
+            <div style="min-width:56px;"><div style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">🔍 Conferência</div><div style="font-size:15px;font-weight:800;color:var(--cyan);line-height:1;">${d.conf}</div></div>
+            <div style="min-width:56px;"><div style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">🔴 Correção</div><div style="font-size:15px;font-weight:800;color:var(--red);line-height:1;">${d.corr}</div></div>
+            <div style="min-width:56px;"><div style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">✅ Finalizado</div><div style="font-size:15px;font-weight:800;color:var(--green);line-height:1;">${d.fin}</div></div>
+          </div>
+          <div style="width:130px;margin-left:auto;">
+            <div style="height:7px;border-radius:4px;background:var(--border);overflow:hidden;display:flex;gap:2px;">${segs.map(s=>`<div style="width:${s.v/segTotal*100}%;background:${s.c};border-radius:2px;"></div>`).join('')}</div>
+            <div style="font-size:10.5px;font-weight:700;margin-top:3px;text-align:right;color:${corPct};">${pctFin}% finalizado</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
 
   const porResp = {}; // { nome: { empresas, apuradas, noPrazo, foraPrazo, ultimoDia, correcoes } }
 
