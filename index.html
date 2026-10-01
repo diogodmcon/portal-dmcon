@@ -14139,6 +14139,7 @@ function fopAbrirModal(cnpj, imposto, fam){
       ${fopIsConferente()?`<div style="margin-top:14px;">
         <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Alterar Status</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">${stHtml}</div>
+        <button onclick="fopAbrirExclusaoRegistro('${cnpj}','${imposto}','${fam||''}')" style="margin-top:10px;width:100%;padding:9px;border-radius:8px;background:transparent;border:1px dashed rgba(255,77,106,.4);color:var(--red);font-weight:700;cursor:pointer;font-size:11px;">🗑️ Excluir Este Registro (foi lançado errado)</button>
       </div>`:''}
     </div>
   </div>`;
@@ -14472,6 +14473,61 @@ function fopConfirmarCorrecao(){
     reader.onload=e=>finalizar(e.target.result);
     reader.readAsDataURL(file);
   } else finalizar(null);
+}
+
+// Excluir registro de uma obrigação (cnpj+imposto+mês) — diferente de "🔴 Correção", que marca a
+// tarefa pra ser refeita mas mantém o histórico. Diogo, 01/10/2026: "tem algumas coisas que eles
+// fazem por ação e colocaram errado, colocaram de outro mês... tem lá 15 rotinas automáticas. Não é
+// pra correção, é porque foi feito errado." — ele quer apagar DE VERDADE um lançamento feito no mês
+// errado (status, checklist, observações, tudo), como se nunca tivesse acontecido, e pediu uma
+// confirmação por palavra-chave pra não ser fácil clicar sem querer. Restrito a conferentes (mesmo
+// nível de acesso de "⚙️ Configurar Fiscal"/"🔴 Correção"), com a ação registrada no histórico.
+const FOP_EXCLUSAO_PALAVRA='EXCLUIR';
+let _fopExclCnpj=null, _fopExclImp=null, _fopExclFam=null;
+function fopAbrirExclusaoRegistro(cnpj, imposto, fam){
+  if(!fopIsConferente()){ mostrarToast('🔒 Apenas conferentes podem excluir um registro'); return; }
+  // Um cronômetro rodando significa que alguém está trabalhando nisso agora — não faz sentido
+  // apagar o registro debaixo dessa pessoa; peça pra concluir/pausar antes.
+  if(fopTempoAtivo(cnpj,imposto,fam)){ mostrarToast('⏱️ Conclua ou pause o cronômetro desta obrigação antes de excluir'); return; }
+  _fopExclCnpj=cnpj; _fopExclImp=imposto; _fopExclFam=fam;
+  const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
+  const mesLabel=document.getElementById('fiscal-mes-label')?.textContent||'';
+  let m=document.getElementById('modal-excluir-registro');
+  if(!m){ m=document.createElement('div'); m.id='modal-excluir-registro'; m.className='modal-overlay'; document.body.appendChild(m); }
+  m.innerHTML=`<div class="modal" style="max-width:460px;width:90%;">
+    <div class="modal-header">
+      <div style="font-size:15px;font-weight:700;color:var(--red);">🗑️ Excluir Registro</div>
+      <button class="modal-close" onclick="document.getElementById('modal-excluir-registro').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <div style="font-size:12.5px;color:var(--text-primary);margin-bottom:12px;line-height:1.5;">
+        Isso vai apagar <strong>${FOP_LABELS[imposto]||imposto}</strong> de <strong>${empresa?.nome||cnpj}</strong> em <strong>${mesLabel}</strong> — status, checklist, cronômetro e observações voltam como se essa obrigação nunca tivesse sido feita neste mês. <span style="color:var(--red);font-weight:700;">Isso não pode ser desfeito.</span>
+      </div>
+      <label style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Pra confirmar, digite <span style="color:var(--red);">${FOP_EXCLUSAO_PALAVRA}</span> abaixo</label>
+      <input id="excl-confirma" type="text" autocomplete="off" oninput="document.getElementById('excl-confirmar-btn').disabled=(this.value.trim().toUpperCase()!=='${FOP_EXCLUSAO_PALAVRA}')" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text-primary);margin:8px 0 14px;font-size:13px;" placeholder="${FOP_EXCLUSAO_PALAVRA}">
+      <button id="excl-confirmar-btn" disabled onclick="fopConfirmarExclusaoRegistro()" style="width:100%;padding:10px;border-radius:8px;background:rgba(255,77,106,.15);border:1px solid rgba(255,77,106,.4);color:var(--red);font-weight:700;cursor:pointer;">Excluir Definitivamente</button>
+    </div>
+  </div>`;
+  m.classList.add('open');
+  setTimeout(()=>document.getElementById('excl-confirma')?.focus(),50);
+}
+function fopConfirmarExclusaoRegistro(){
+  const valor=(document.getElementById('excl-confirma')?.value||'').trim().toUpperCase();
+  if(valor!==FOP_EXCLUSAO_PALAVRA) return; // botão já vem desabilitado, mas confere de novo por segurança
+  const cnpj=_fopExclCnpj, imposto=_fopExclImp, fam=_fopExclFam;
+  if(!cnpj||!imposto) return;
+  const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
+  const apur=fopGetApur(cnpj, fam);
+  const mesLabel=document.getElementById('fiscal-mes-label')?.textContent||'';
+  const statusAnterior=(apur[imposto]||{}).status||'';
+  delete apur[imposto];
+  fopLog(empresa?.nome||cnpj, cnpj, imposto, '🗑️ Registro excluído', `Lançamento de ${mesLabel} apagado (status anterior: ${FOP_STATUS[statusAnterior]?.label||'nenhum'})`);
+  fopSalvar();
+  document.getElementById('modal-excluir-registro')?.classList.remove('open');
+  document.getElementById('modal-fop')?.classList.remove('open');
+  fam==='acess'?renderFiscalTableAcess():renderFiscalTable();
+  if(typeof fopRenderConferencia==='function') fopRenderConferencia();
+  mostrarToast('🗑️ Registro excluído: '+(FOP_LABELS[imposto]||imposto)+' de '+(empresa?.nome||cnpj)+' ('+mesLabel+')');
 }
 
 // ── MÓDULO 4: TAREFAS ────────────────────────────────────────────────────────
