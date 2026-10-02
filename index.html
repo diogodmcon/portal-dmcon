@@ -1936,6 +1936,7 @@ planilha com CNPJ + responsável e atualiza, de uma vez, o "Resp. Fiscal" do cad
     </div>
     <div class="topbar-right">
       <button class="btn btn-ghost" onclick="exportarExcel('clientes')" title="Exportar Excel">📥 Excel</button>
+      <button class="btn btn-ghost" onclick="opAbrirSincronizarRespFiscal()" title="Atualiza o Responsável Fiscal de cada empresa aqui em Clientes, usando o responsável que está valendo agora no módulo Fiscal">🔄 Sincronizar Resp. Fiscal</button>
       <button class="btn btn-ghost" onclick="document.getElementById('modal-add-cliente').classList.add('open')">+ Adicionar</button>
       <button class="btn btn-green" onclick="document.getElementById('file-input').click()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -2210,15 +2211,26 @@ planilha com CNPJ + responsável e atualiza, de uma vez, o "Resp. Fiscal" do cad
        existe no Dashboard Fiscal (Gerencial), só que aqui escopada às empresas do usuário logado
        (mesma base _baseSemImp/_baseResp dos cards por imposto logo abaixo). -->
   <div id="fiscal-resumo-strip" style="padding:8px 28px 0;">
-    <div style="font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;" id="fiscal-resumo-titulo">📌 Minhas empresas</div>
-    <div class="kpi-strip" id="fiscal-resumo-empresas-strip">
-      <div class="kpi-mini k1" onclick="fopKpiFiltrar('todos')" style="cursor:pointer;"><div class="kpi-lbl">Total de Empresas</div><div class="kpi-val" id="fiscal-resumo-total">0</div><div class="kpi-tag tag-blue">sob meu cuidado</div></div>
-      <div class="kpi-mini k3" onclick="fopKpiFiltrar('apurando')" style="cursor:pointer;"><div class="kpi-lbl">A Apurar</div><div class="kpi-val" id="fiscal-resumo-apurar">0</div><div class="kpi-tag tag-warn">andamento</div></div>
-      <div class="kpi-mini k6" onclick="fopKpiFiltrar('rotina_automatica')" style="cursor:pointer;"><div class="kpi-lbl">Rotina Automática</div><div class="kpi-val" id="fiscal-resumo-rotina">0</div><div class="kpi-tag" style="background:rgba(167,139,250,.15);color:#a78bfa;">PGDAS</div></div>
-      <div class="kpi-mini k6" onclick="fopKpiFiltrar('conferencia_final')" style="cursor:pointer;"><div class="kpi-lbl">Finalizar Rotina Automática</div><div class="kpi-val" id="fiscal-resumo-finalizar-rotina">0</div><div class="kpi-tag" style="background:rgba(251,146,60,.15);color:#fb923c;">PGDAS</div></div>
-      <div class="kpi-mini k5" onclick="fopAbrirConferenciaCard()" style="cursor:pointer;"><div class="kpi-lbl">Em Conferência</div><div class="kpi-val" id="fiscal-resumo-conferencia">0</div><div class="kpi-tag" style="background:rgba(100,180,255,.12);color:#60a5fa;">conferir</div></div>
-      <div class="kpi-mini k4" onclick="fopToggleCorrecaoInline()" style="cursor:pointer;"><div class="kpi-lbl">Em Correção</div><div class="kpi-val" id="fiscal-resumo-correcao">0</div><div class="kpi-tag tag-red">revisão</div></div>
-      <div class="kpi-mini k2" onclick="fopAbrirFinalizadosCard()" style="cursor:pointer;"><div class="kpi-lbl">Finalizadas</div><div class="kpi-val" id="fiscal-resumo-finalizadas">0</div><div class="kpi-tag tag-up">concluídas</div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);" id="fiscal-resumo-titulo">📌 Minhas empresas</div>
+      <button id="fiscal-dash-toggle-btn" onclick="fopToggleDashboardResumo()" title="Minimizar ou mostrar os cards de resumo (pra sobrar mais espaço pra lista de empresas)" style="background:transparent;border:1px solid var(--border);border-radius:6px;padding:2px 9px;font-size:10px;font-weight:700;color:var(--text-muted);cursor:pointer;white-space:nowrap;flex-shrink:0;">▲ Minimizar</button>
+    </div>
+    <!-- Diogo, 02/10/2026: "tem como botar um botão minimizar aquela parte de dashboard... não os
+         cards das empresas" — fiscal-dash-corpo (os cards de resumo aqui embaixo) e o bloco inteiro
+         de fiscal-tarefas-strip (cards por imposto) escondem juntos; a lista/cards das empresas
+         (dentro de #fsub-apuracoes, mais abaixo) nunca é afetada. Preferência salva só localmente
+         (é só um ajuste de tela, não precisa sincronizar entre usuários) — ver
+         fopToggleDashboardResumo/fopAplicarPreferenciaDashboard. -->
+    <div id="fiscal-dash-corpo">
+      <div class="kpi-strip" id="fiscal-resumo-empresas-strip">
+        <div class="kpi-mini k1" onclick="fopKpiFiltrar('todos')" style="cursor:pointer;"><div class="kpi-lbl">Total de Empresas</div><div class="kpi-val" id="fiscal-resumo-total">0</div><div class="kpi-tag tag-blue">sob meu cuidado</div></div>
+        <div class="kpi-mini k3" onclick="fopKpiFiltrar('apurando')" style="cursor:pointer;"><div class="kpi-lbl">A Apurar</div><div class="kpi-val" id="fiscal-resumo-apurar">0</div><div class="kpi-tag tag-warn">andamento</div></div>
+        <div class="kpi-mini k6" onclick="fopKpiFiltrar('rotina_automatica')" style="cursor:pointer;"><div class="kpi-lbl">Rotina Automática</div><div class="kpi-val" id="fiscal-resumo-rotina">0</div><div class="kpi-tag" style="background:rgba(167,139,250,.15);color:#a78bfa;">PGDAS</div></div>
+        <div class="kpi-mini k6" onclick="fopKpiFiltrar('conferencia_final')" style="cursor:pointer;"><div class="kpi-lbl">Finalizar Rotina Automática</div><div class="kpi-val" id="fiscal-resumo-finalizar-rotina">0</div><div class="kpi-tag" style="background:rgba(251,146,60,.15);color:#fb923c;">PGDAS</div></div>
+        <div class="kpi-mini k5" onclick="fopAbrirConferenciaCard()" style="cursor:pointer;"><div class="kpi-lbl">Em Conferência</div><div class="kpi-val" id="fiscal-resumo-conferencia">0</div><div class="kpi-tag" style="background:rgba(100,180,255,.12);color:#60a5fa;">conferir</div></div>
+        <div class="kpi-mini k4" onclick="fopToggleCorrecaoInline()" style="cursor:pointer;"><div class="kpi-lbl">Em Correção</div><div class="kpi-val" id="fiscal-resumo-correcao">0</div><div class="kpi-tag tag-red">revisão</div></div>
+        <div class="kpi-mini k2" onclick="fopAbrirFinalizadosCard()" style="cursor:pointer;"><div class="kpi-lbl">Finalizadas</div><div class="kpi-val" id="fiscal-resumo-finalizadas">0</div><div class="kpi-tag tag-up">concluídas</div></div>
+      </div>
     </div>
   </div>
   <div id="fiscal-tarefas-strip" style="padding:5px 28px 0;">
@@ -2706,6 +2718,44 @@ planilha com CNPJ + responsável e atualiza, de uma vez, o "Resp. Fiscal" do cad
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="document.getElementById('modal-editar-cliente').classList.remove('open')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarEdicaoCliente()">Salvar Alterações</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SINCRONIZAR RESP. FISCAL (CLIENTES ← FISCAL) -->
+<!-- Diogo, 02/10/2026: "no fiscal nós atualizamos os responsáveis. Porém, lá em clientes tem uma
+aba responsável fiscal que está totalmente desatualizado. Tem como atualizar aquelas empresas
+dentro de clientes conforme responsável do fiscal?" — o responsável "oficial" de cada empresa no
+módulo Fiscal (cfg.respMes, usado em "⚙️ Configurar Fiscal" e na Rotina Automática) pode mudar sem
+que ninguém lembre de replicar manualmente pra cá — ver opAbrirSincronizarRespFiscal/
+opConfirmarSincronizarRespFiscal. -->
+<div class="modal-overlay" id="modal-sync-respfiscal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="width:620px;max-width:95vw;">
+    <div class="modal-header">
+      <div><div class="modal-title">🔄 Sincronizar Resp. Fiscal</div><div class="modal-sub">Atualiza a coluna "Fiscal" aqui em Clientes usando o responsável atual de cada empresa lá no módulo Fiscal</div></div>
+      <button class="modal-close" onclick="document.getElementById('modal-sync-respfiscal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="sync-respfiscal-resumo" style="margin-bottom:12px;font-size:12.5px;font-weight:700;"></div>
+      <div style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+        <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+          <thead style="position:sticky;top:0;background:var(--bg-card);">
+            <tr>
+              <th style="text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);">Empresa</th>
+              <th style="text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);">Em Clientes (atual)</th>
+              <th style="text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);">No Fiscal (vai virar)</th>
+            </tr>
+          </thead>
+          <tbody id="sync-respfiscal-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('modal-sync-respfiscal').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-primary" id="sync-respfiscal-confirmar" onclick="opConfirmarSincronizarRespFiscal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Confirmar Atualização
+      </button>
     </div>
   </div>
 </div>
@@ -3974,6 +4024,57 @@ async function atualizarClienteSupabase(cliente){
     console.warn('Erro ao atualizar cliente:', e.message);
     return false;
   }
+}
+
+// Diogo, 02/10/2026: "no fiscal nós atualizamos os responsáveis. Porém, lá em clientes tem uma aba
+// responsável fiscal que está totalmente desatualizado." — o responsável "oficial" de cada empresa
+// no módulo Fiscal é fopFiscalConfigs[cnpj].respMes (o que aparece em "⚙️ Configurar Fiscal" e é
+// usado pela Rotina Automática), e ele pode ser alterado por lá sem que ninguém lembre de replicar
+// essa mudança manualmente pra cá em Clientes (c.respFiscal) — por isso os dois foram ficando
+// diferentes com o tempo. Esta função monta a lista de quem está diferente, SEM aplicar nada ainda
+// (só mostra a prévia — ver opConfirmarSincronizarRespFiscal pra aplicar de fato).
+let opSyncRespFiscalLista=[];
+function opAbrirSincronizarRespFiscal(){
+  opSyncRespFiscalLista=[];
+  (typeof opClientes!=='undefined'?opClientes:[]).forEach(c=>{
+    if(c.ativo===false) return;
+    const cfg=(typeof fopFiscalConfigs!=='undefined'?fopFiscalConfigs:{})[fopNormCnpj(c.cnpj)];
+    const respFiscalNoFiscal=(cfg&&cfg.respMes||'').trim();
+    if(!respFiscalNoFiscal) return; // empresa ainda sem responsável definido no Fiscal — nada a sincronizar
+    if(respFiscalNoFiscal===(c.respFiscal||'').trim()) return; // já está igual
+    opSyncRespFiscalLista.push({cliente:c, respAntigo:c.respFiscal||'—', respNovo:respFiscalNoFiscal});
+  });
+  const resumo=document.getElementById('sync-respfiscal-resumo');
+  const tbody=document.getElementById('sync-respfiscal-tbody');
+  const btn=document.getElementById('sync-respfiscal-confirmar');
+  if(!opSyncRespFiscalLista.length){
+    resumo.innerHTML='✅ Tudo certo — o Responsável Fiscal de todas as empresas aqui em Clientes já está igual ao do módulo Fiscal. Nada pra atualizar.';
+    tbody.innerHTML='';
+    if(btn){ btn.disabled=true; btn.style.display='none'; }
+  } else {
+    resumo.innerHTML=`🔎 <strong>${opSyncRespFiscalLista.length} empresa(s)</strong> estão com o Responsável Fiscal diferente do que está valendo agora no módulo Fiscal — confira abaixo e confirme pra atualizar.`;
+    tbody.innerHTML=opSyncRespFiscalLista.map(r=>`
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:6px 10px;">${r.cliente.nome||''}</td>
+        <td style="padding:6px 10px;color:var(--text-muted);">${r.respAntigo}</td>
+        <td style="padding:6px 10px;color:var(--cyan);font-weight:700;">${r.respNovo}</td>
+      </tr>`).join('');
+    if(btn){ btn.disabled=false; btn.style.display=''; }
+  }
+  document.getElementById('modal-sync-respfiscal').classList.add('open');
+}
+async function opConfirmarSincronizarRespFiscal(){
+  if(!opSyncRespFiscalLista.length) return;
+  const btn=document.getElementById('sync-respfiscal-confirmar');
+  if(btn){ btn.disabled=true; btn.textContent='Aplicando...'; }
+  opSyncRespFiscalLista.forEach(r=>{ r.cliente.respFiscal=r.respNovo; });
+  opRender();
+  const resultados=await Promise.all(opSyncRespFiscalLista.map(r=>atualizarClienteSupabase(r.cliente)));
+  const falhas=resultados.filter(ok=>!ok).length;
+  document.getElementById('modal-sync-respfiscal').classList.remove('open');
+  if(btn){ btn.disabled=false; btn.textContent='Confirmar Atualização'; }
+  mostrarToast('✅ Resp. Fiscal sincronizado: '+opSyncRespFiscalLista.length+' empresa(s)'+(falhas?' · ⚠️ '+falhas+' não sincronizaram com o servidor (salvo aqui, tente de novo mais tarde)':''));
+  opSyncRespFiscalLista=[];
 }
 
 function atualizarKpisOp(){
@@ -13484,6 +13585,34 @@ function fopAbrirDetalheKpiAcess(tipo){
   painel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
+// Diogo, 02/10/2026: "tem como botar um botão minimizar aquela parte de dashboard... não os cards
+// das empresas" — minimiza/mostra de volta os cards de resumo (🏢 Total de Empresas, A Apurar etc.)
+// e os cards por imposto (PGDAS, ICMS etc.) de uma vez, deixando a lista/cards das empresas sempre
+// visível do jeito que estava. Preferência salva só em localStorage (ajuste de tela, não precisa
+// sincronizar entre usuários/abas) e reaplicada na próxima vez que o Portal é aberto.
+let fopDashResumoMinimizado=false;
+function fopToggleDashboardResumo(){
+  fopDashResumoMinimizado=!fopDashResumoMinimizado;
+  fopAplicarPreferenciaDashboard();
+  try{ localStorage.setItem('fopDashResumoMinimizado', fopDashResumoMinimizado?'1':'0'); }catch(e){}
+}
+// Aplica o estado minimizado/aberto — chamada tanto pelo toggle acima quanto uma vez na carga da
+// página (ver fopCarregar() lá no final do arquivo), pra lembrar o que o usuário deixou da última vez.
+function fopAplicarPreferenciaDashboard(){
+  const corpo=document.getElementById('fiscal-dash-corpo');
+  const tarefas=document.getElementById('fiscal-tarefas-strip');
+  const btn=document.getElementById('fiscal-dash-toggle-btn');
+  if(corpo) corpo.style.display=fopDashResumoMinimizado?'none':'';
+  if(tarefas) tarefas.style.display=fopDashResumoMinimizado?'none':'';
+  // A caixa "Em Correção" (aberta clicando no card "Em Correção") some junto quando minimiza, mas
+  // volta sozinha ao reabrir — sem precisar clicar em "Em Correção" de novo — se já estava aberta.
+  const correcao=document.getElementById('fiscal-correcao-inline');
+  if(correcao && typeof fopCorrecaoInlineAberto!=='undefined'){
+    correcao.style.display=(!fopDashResumoMinimizado && fopCorrecaoInlineAberto)?'block':'none';
+  }
+  if(btn) btn.innerHTML=fopDashResumoMinimizado?'▼ Mostrar resumo':'▲ Minimizar';
+}
+
 let fopCorrecaoInlineAberto=false;
 function fopToggleCorrecaoInline(){
   fopCorrecaoInlineAberto=!fopCorrecaoInlineAberto;
@@ -16250,6 +16379,9 @@ async function chkExcluir(id,nome){
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 fopCarregar();
+// Lembra se o usuário tinha deixado o resumo do Fiscal minimizado (ver fopToggleDashboardResumo)
+try{ fopDashResumoMinimizado = localStorage.getItem('fopDashResumoMinimizado')==='1'; }catch(e){}
+fopAplicarPreferenciaDashboard();
 </script>
 
 
