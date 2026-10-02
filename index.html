@@ -2062,8 +2062,7 @@ planilha com CNPJ + responsável e atualiza, de uma vez, o "Resp. Fiscal" do cad
     <div class="fsnav" onclick="contTab('checklist',this)">✅ Checklist</div>
     <div class="fsnav" onclick="contTab('conferencia',this)">🔎 Conferência</div>
     <div class="fsnav" onclick="contTab('gerencial',this)">📈 Gerencial</div>
-    <button id="cont-btn-limpar" onclick="contLimparDadosTeste()" style="display:none;margin-left:auto;padding:8px 14px;border-radius:7px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--red);font-size:12px;font-weight:600;cursor:pointer;" title="Apaga apurações, checklists marcados e obrigações acessórias salvos">🗑️ Limpar dados de teste</button>
-    <button onclick="contAbrirColaboradores()" style="padding:8px 14px;border-radius:7px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;">👥 Colaboradores</button>
+    <button onclick="contAbrirColaboradores()" style="margin-left:auto;padding:8px 14px;border-radius:7px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;">👥 Colaboradores</button>
   </div>
 
   <!-- ── EMPRESAS ── -->
@@ -2250,7 +2249,6 @@ planilha com CNPJ + responsável e atualiza, de uma vez, o "Resp. Fiscal" do cad
       </div>
       <button class="conf-restrito conf-hidden" onclick="fopAbrirColaboradores()" style="padding:8px 14px;border-radius:7px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer;">👥 Colaboradores</button>
       <button class="btn btn-primary" onclick="abrirCadastroEmpresa()">+ Nova Empresa</button>
-      <button id="fop-btn-limpar" onclick="fopLimparDadosTeste()" style="display:none;padding:8px 14px;border-radius:7px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--red);font-size:12px;font-weight:600;cursor:pointer;" title="Apaga apuracoes, tarefas e historico salvos">🗑️ Limpar dados de teste</button>
     </div>
     <div style="flex:1;overflow:auto;border-top:1px solid var(--border);">
       <table id="fiscal-table" style="display:none;border-collapse:separate;border-spacing:0;font-size:11.5px;white-space:nowrap;width:100%;min-width:1200px;">
@@ -3250,21 +3248,6 @@ function aplicarAcesso(user){
   document.querySelectorAll('.conf-restrito').forEach(elx=>{
     if(_ehConferente) elx.classList.remove('conf-hidden'); else elx.classList.add('conf-hidden');
   });
-  const _btnLimpar=document.getElementById('fop-btn-limpar');
-  if(_btnLimpar) _btnLimpar.style.display=_ehConferente?'':'none';
-  // "🗑️ Limpar dados de teste" do Contábil — igual ao do Fiscal, só que mais restrito: só Diogo e
-  // Marília (o Fiscal também libera pro Nicolas, mas o Diogo pediu explicitamente "somente eu e a
-  // Marília" pra essa do Contábil, então não reaproveita o _ehConferente de cima).
-  const _btnLimparCont=document.getElementById('cont-btn-limpar');
-  if(_btnLimparCont) _btnLimparCont.style.display=contPodeLimparTeste(user)?'':'none';
-}
-// Só Diogo (login "DIOGO" ou "MASTER" — são a mesma pessoa) e Marília — igual ao "podeExcluir" já
-// usado em Clientes, ver excluirCliente(). Recebe o usuário opcionalmente (aplicarAcesso já tem a
-// mão nele); sem argumento, usa o usuarioLogado global.
-function contPodeLimparTeste(user){
-  const u=user||(typeof usuarioLogado!=='undefined'?usuarioLogado:null);
-  const _u=(u&&u.usuario||'').toUpperCase();
-  return _u==='DIOGO'||_u==='MASTER'||_u==='MARILIA';
 }
 
 function abrirAlterarSenha(){
@@ -3407,10 +3390,6 @@ function fazerLogout(){
     el.title='';
   });
   document.querySelectorAll('.conf-restrito').forEach(elx=>elx.classList.add('conf-hidden'));
-  const _btnLimparOut=document.getElementById('fop-btn-limpar');
-  if(_btnLimparOut) _btnLimparOut.style.display='none';
-  const _btnLimparContOut=document.getElementById('cont-btn-limpar');
-  if(_btnLimparContOut) _btnLimparContOut.style.display='none';
 }
 
 function toggleSenha(){
@@ -10384,6 +10363,15 @@ const FOP_CALENDARIO_IMPS = [...FOP_IMPOSTOS.filter(i=>i!=='conferencia'), ...FO
 
 // ── ESTADO ──────────────────────────────────────────────────────────────────
 let fopApur = {};
+// Diogo, 02/10/2026: "a gente excluiu, porém na hora ele exclui, dá um segundo e ele volta de novo"
+// — o mesmo bug da lápide dos itens extras (ver fopItensExtraLibExcluidos), só que um nível mais
+// fundo: fopApur é salvo com fopSalvarChaveMesclada, que devolve pro objeto local qualquer "mesKey"
+// (empresa_ano_mês) que só exista no banco — e também, dentro de cada mesKey, qualquer "imposto" que
+// só exista no banco. fopConfirmarExclusaoRegistro() apaga só o imposto (`delete apur[imposto]`),
+// não o mesKey inteiro — então a lápide de 1º nível não enxergava essa exclusão, e a mesclagem
+// devolvia o imposto apagado de volta, como se esta aba "nunca tivesse visto" ele. A lápide aqui usa
+// chaves compostas "mesKey|imposto" (ver fopSalvarChaveMesclada mais abaixo).
+let fopApurExcluidos = {};
 let fopTarefas = [];
 let fopHistorico = [];
 let fopFiltroRegime2 = 'todos';
@@ -10486,6 +10474,10 @@ async function fopSalvarChaveMesclada(chave, valorLocal, idsExcluidos){
             valorLocal[mesKey] = remoto[mesKey];
           } else if(remoto[mesKey] && typeof remoto[mesKey]==='object' && valorLocal[mesKey] && typeof valorLocal[mesKey]==='object'){
             Object.keys(remoto[mesKey]).forEach(impKey=>{
+              // Lápide de 2º nível (ex.: fopApurExcluidos, chave "mesKey|imposto") — pra não
+              // ressuscitar um imposto específico que foi excluído de propósito dentro de um mesKey
+              // que continua existindo (ver fopConfirmarExclusaoRegistro/fopApurExcluidos acima).
+              if(idsExcluidos && idsExcluidos[mesKey+'|'+impKey]) return;
               if(!(impKey in valorLocal[mesKey])) valorLocal[mesKey][impKey] = remoto[mesKey][impKey];
             });
           }
@@ -10498,6 +10490,7 @@ async function fopSalvarChaveMesclada(chave, valorLocal, idsExcluidos){
 function fopSalvar() {
   // Salvar localmente como fallback imediato
   try { localStorage.setItem('fopApur', JSON.stringify(fopApur)); } catch(e){}
+  try { localStorage.setItem('fopApurExcluidos', JSON.stringify(fopApurExcluidos)); } catch(e){}
   try { localStorage.setItem('fopTarefas', JSON.stringify(fopTarefas)); } catch(e){}
   try { localStorage.setItem('fopHistorico', JSON.stringify(fopHistorico)); } catch(e){}
   try { localStorage.setItem('fopPartic', JSON.stringify(fopParticOverride)); } catch(e){}
@@ -10518,7 +10511,12 @@ function fopSalvar() {
   // Salvar no Supabase para sincronizar com todos os usuários
   // (fiscal_apur, fiscal_apur_acess, fiscal_prazos_internos, contabil_apur e contabil_apur_acess usam
   // a versão "mesclada" — ver fopSalvarChaveMesclada — pra não apagar dados de outras pessoas/abas)
-  fopSalvarChaveMesclada('fiscal_apur', fopApur);
+  // Passa a lápide (fopApurExcluidos, chaves "mesKey|imposto") pra mesclagem não trazer de volta um
+  // registro excluído de propósito em "🗑️ Excluir Este Registro" — ver fopConfirmarExclusaoRegistro.
+  fopSalvarChaveMesclada('fiscal_apur', fopApur, fopApurExcluidos);
+  // A lista de excluídos em si é só "soma" (uma exclusão feita em qualquer aba vale pra sempre),
+  // então pode usar a mesclagem normal, sem lápide própria — igual a fiscal_itens_extra_lib_excluidos.
+  fopSalvarChaveMesclada('fiscal_apur_excluidos', fopApurExcluidos);
   fopSalvarChave('fiscal_tarefas', fopTarefas);
   fopSalvarChave('fiscal_historico', fopHistorico);
   fopSalvarChave('fiscal_partic', fopParticOverride);
@@ -10533,7 +10531,9 @@ function fopSalvar() {
   // A própria lista de excluídos é só "soma" (uma exclusão feita em qualquer aba deve valer pra
   // sempre) — por isso pode usar a mesclagem normal, sem lápide própria.
   fopSalvarChaveMesclada('fiscal_itens_extra_lib_excluidos', fopItensExtraLibExcluidos);
-  fopSalvarChaveMesclada('fiscal_apur_acess', fopApurAcess);
+  // Obrigações Acessórias usam o mesmo "mesKey" (fopGetKey) e os mesmos nomes de imposto nunca se
+  // repetem entre os dois grupos — por isso reaproveita a mesma lápide fopApurExcluidos.
+  fopSalvarChaveMesclada('fiscal_apur_acess', fopApurAcess, fopApurExcluidos);
   fopSalvarChave('fiscal_tempos', fopTempos);
   fopSalvarChave('contabil_configs', contConfigs);
   fopSalvarChave('contabil_colaboradores', contColaboradores);
@@ -10557,13 +10557,14 @@ function fopSalvar() {
 }
 async function fopCarregarSupa(){
   try {
-    const chaves = ['fiscal_apur','fiscal_tarefas','fiscal_historico','fiscal_partic','fiscal_configs','fiscal_prazos_internos','fiscal_colaboradores','fiscal_vencimentos_manuais','fiscal_apur_acess','fiscal_tempos','fiscal_itens_extra_lib','fiscal_itens_extra_lib_excluidos','contabil_configs','contabil_colaboradores','contabil_checklists','contabil_apur','contabil_apur_acess','contabil_tempos'];
+    const chaves = ['fiscal_apur','fiscal_apur_excluidos','fiscal_tarefas','fiscal_historico','fiscal_partic','fiscal_configs','fiscal_prazos_internos','fiscal_colaboradores','fiscal_vencimentos_manuais','fiscal_apur_acess','fiscal_tempos','fiscal_itens_extra_lib','fiscal_itens_extra_lib_excluidos','contabil_configs','contabil_colaboradores','contabil_checklists','contabil_apur','contabil_apur_acess','contabil_tempos'];
     const { data } = await sb.from('configuracoes').select('chave,valor').in('chave', chaves);
     if(data && data.length){
       data.forEach(row=>{
         try {
           const val = JSON.parse(row.valor);
           if(row.chave==='fiscal_apur') fopApur=val;
+          else if(row.chave==='fiscal_apur_excluidos') fopApurExcluidos=val;
           else if(row.chave==='fiscal_tarefas') fopTarefas=val;
           else if(row.chave==='fiscal_historico') fopHistorico=val;
           else if(row.chave==='fiscal_partic') fopParticOverride=val;
@@ -10587,6 +10588,15 @@ async function fopCarregarSupa(){
       // ainda apareça na biblioteca (ex.: ficou "fantasma" salvo antes desta correção) é removido
       // aqui também, na hora de carregar — não só na hora de salvar.
       Object.keys(fopItensExtraLibExcluidos).forEach(id=>{ if(fopItensExtraLib[id]) delete fopItensExtraLib[id]; });
+      // Mesma limpeza defensiva pra registros de apuração excluídos via "🗑️ Excluir Este Registro"
+      // (chave composta "mesKey|imposto") — remove qualquer fantasma que tenha sobrado salvo, tanto
+      // nas obrigações do mês (fopApur) quanto nas Acessórias (fopApurAcess, mesma lápide).
+      Object.keys(fopApurExcluidos).forEach(chaveComposta=>{
+        const i=chaveComposta.lastIndexOf('|'); if(i<0) return;
+        const mesKey=chaveComposta.slice(0,i), impKey=chaveComposta.slice(i+1);
+        if(fopApur[mesKey] && fopApur[mesKey][impKey]) delete fopApur[mesKey][impKey];
+        if(fopApurAcess[mesKey] && fopApurAcess[mesKey][impKey]) delete fopApurAcess[mesKey][impKey];
+      });
       return true; // carregou do Supabase
     }
   } catch(e){ console.warn('fopCarregarSupa:', e.message); }
@@ -10594,6 +10604,7 @@ async function fopCarregarSupa(){
 }
 function fopCarregar() {
   try { const d=localStorage.getItem('fopApur'); if(d) fopApur=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('fopApurExcluidos'); if(d) fopApurExcluidos=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopTarefas'); if(d) fopTarefas=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopHistorico'); if(d) fopHistorico=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopPartic'); if(d) fopParticOverride=JSON.parse(d); } catch(e){}
@@ -10605,6 +10616,13 @@ function fopCarregar() {
   try { const d=localStorage.getItem('fopItensExtraLibExcluidos'); if(d) fopItensExtraLibExcluidos=JSON.parse(d); } catch(e){}
   Object.keys(fopItensExtraLibExcluidos).forEach(id=>{ if(fopItensExtraLib[id]) delete fopItensExtraLib[id]; });
   try { const d=localStorage.getItem('fopApurAcess'); if(d) fopApurAcess=JSON.parse(d); } catch(e){}
+  // Mesma limpeza defensiva do fopCarregarSupa — ver fopApurExcluidos.
+  Object.keys(fopApurExcluidos).forEach(chaveComposta=>{
+    const i=chaveComposta.lastIndexOf('|'); if(i<0) return;
+    const mesKey=chaveComposta.slice(0,i), impKey=chaveComposta.slice(i+1);
+    if(fopApur[mesKey] && fopApur[mesKey][impKey]) delete fopApur[mesKey][impKey];
+    if(fopApurAcess[mesKey] && fopApurAcess[mesKey][impKey]) delete fopApurAcess[mesKey][impKey];
+  });
   try { const d=localStorage.getItem('fopTempos'); if(d) fopTempos=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('contConfigs'); if(d) contConfigs=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('contColaboradores'); if(d) contColaboradores=JSON.parse(d); } catch(e){}
@@ -11160,25 +11178,6 @@ function contSeedColaboradoresSeNecessario(){
 }
 
 // Cadastro de Colaboradores Contábeis — modal simples de adicionar/ativar-desativar/remover/renomear
-// "🗑️ Limpar dados de teste" do Contábil — igual ao fopLimparDadosTeste() do Fiscal: apaga só o
-// que foi PREENCHIDO usando o módulo (apuração mensal marcada, obrigações acessórias, cronômetro),
-// mantendo a configuração de cada empresa (responsável, checklists escolhidos) e a biblioteca de
-// checklists intactas — não faz sentido o Diogo/Marília terem que reconfigurar tudo de novo só pra
-// limpar o que foi clicado durante os testes. Botão só aparece pra quem contPodeLimparTeste() libera.
-function contLimparDadosTeste(){
-  if(!contPodeLimparTeste()){ mostrarToast('🔒 Apenas Diogo e Marília podem limpar os dados de teste'); return; }
-  const ok1=confirm('Isso vai APAGAR toda a apuração mensal marcada, obrigações acessórias e cronômetros do Contábil, deixando todas as empresas como "Não iniciado" novamente.\n\nAs configurações de cada empresa (responsável, checklists escolhidos) e a biblioteca de checklists NÃO serão apagadas.\n\nEsta ação não pode ser desfeita. Continuar?');
-  if(!ok1) return;
-  const ok2=confirm('Tem certeza? Todo o checklist mensal preenchido e as obrigações acessórias marcadas serão perdidos.');
-  if(!ok2) return;
-  contApur={};
-  contApurAcess={};
-  contTempos={ativos:{},registros:[]};
-  fopSalvar();
-  mostrarToast('🗑️ Dados de teste do Contábil apagados — recarregando...');
-  setTimeout(()=>location.reload(),800);
-}
-
 function contAbrirColaboradores(){
   contSeedColaboradoresSeNecessario();
   contColaboradorEditandoId = null;
@@ -13485,20 +13484,6 @@ function fopAbrirDetalheKpiAcess(tipo){
   painel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function fopLimparDadosTeste(){
-  const ok1=confirm('Isso vai APAGAR todo o histórico de apuração, tarefas, correções e particularidades salvos localmente, deixando as 162 empresas como "Não iniciado" novamente.\n\nEsta ação não pode ser desfeita. Continuar?');
-  if(!ok1) return;
-  const ok2=confirm('Tem certeza? Todos os checklists preenchidos e tarefas serão perdidos.');
-  if(!ok2) return;
-  fopApur={};
-  fopTarefas=[];
-  fopHistorico=[];
-  fopParticOverride={};
-  fopSalvar();
-  mostrarToast('🗑️ Dados de teste apagados — recarregando...');
-  setTimeout(()=>location.reload(),800);
-}
-
 let fopCorrecaoInlineAberto=false;
 function fopToggleCorrecaoInline(){
   fopCorrecaoInlineAberto=!fopCorrecaoInlineAberto;
@@ -14521,6 +14506,10 @@ function fopConfirmarExclusaoRegistro(){
   const mesLabel=document.getElementById('fiscal-mes-label')?.textContent||'';
   const statusAnterior=(apur[imposto]||{}).status||'';
   delete apur[imposto];
+  // Lápide (ver fopApurExcluidos) — sem isso, a mesclagem de fopSalvarChaveMesclada traria esse
+  // imposto de volta do banco (porque esta aba "não tem mais ele"), poucos instantes depois de
+  // excluído — exatamente o bug que o Diogo reportou ("exclui, dá um segundo e ele volta de novo").
+  fopApurExcluidos[fopGetKey(cnpj)+'|'+imposto]=new Date().toISOString();
   fopLog(empresa?.nome||cnpj, cnpj, imposto, '🗑️ Registro excluído', `Lançamento de ${mesLabel} apagado (status anterior: ${FOP_STATUS[statusAnterior]?.label||'nenhum'})`);
   fopSalvar();
   document.getElementById('modal-excluir-registro')?.classList.remove('open');
