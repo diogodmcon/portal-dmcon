@@ -2150,6 +2150,7 @@ planilha com CNPJ + responsável e atualiza, de uma vez, o "Resp. Fiscal" do cad
   <div class="topbar">
     <div class="topbar-left"><h1>📊 Fiscal</h1><p>Portal Operacional Fiscal · <span id="fiscal-mes-label">Junho 2026</span></p></div>
     <div class="topbar-right" id="fiscal-topbar-right">
+      <button class="btn btn-ghost" onclick="fopAbrirAjuda()" title="Manual com dúvidas comuns de como usar o Fiscal">❓ Ajuda</button>
       <button class="btn btn-ghost" id="btn-fop-tempo-relatorio" onclick="fopAbrirRelatorioTempos()" title="Ver quanto tempo cada colaborador gasta em cada cliente" style="display:none;">⏱ Tempo por Cliente</button>
       <button class="btn btn-ghost" id="btn-fop-auditoria" onclick="fopAbrirAuditoriaFiscal()" title="Conferir se todo cliente ativo está no Fiscal e com responsável definido" style="display:none;">🔍 Auditoria Fiscal</button>
       <button class="btn btn-ghost" onclick="exportarExcel('fiscal')" title="Exportar Excel">📥 Excel</button>
@@ -2187,6 +2188,16 @@ planilha com CNPJ + responsável e atualiza, de uma vez, o "Resp. Fiscal" do cad
     <div class="fsnav active" onclick="fiscalTab('apuracoes',this)">📊 Apurações</div>
     <div class="fsnav" onclick="fiscalTab('acessorias',this)">🗂️ Obrigações Acessórias</div>
     <div class="fsnav conf-restrito conf-hidden" onclick="fiscalTab('configfiscal',this)">⚙️ Configuração Fiscal <span id="fiscal-badge-cfg" style="display:none;margin-left:4px;background:rgba(245,158,11,.85);color:#1a1300;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;"></span></div>
+    <!-- Diogo, 02/10/2026: "criar uma escrita correções, e todas as empresas que tiverem correções
+    aparecer lá dentro dessa abinha" — reaproveita a tela já pronta de Conferência (fopRenderConferencia),
+    só que abrindo direto no filtro "Em Correção", já com todas as empresas do sistema (não só as do
+    usuário logado) — ver fopAbrirCorrecoesTab. -->
+    <div class="fsnav conf-restrito conf-hidden" onclick="fopAbrirCorrecoesTab(this)">🔴 Correções <span id="fiscal-badge-correcoes" style="display:none;margin-left:4px;background:rgba(255,77,106,.85);color:#2a0007;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;"></span></div>
+    <!-- Diogo, 02/10/2026: "tenho algumas tarefas avulsas que preciso criar para eles... a parte
+    tarefas pode ser aba lá em cima também" — expõe a aba de Tarefas (já existia no código, só não
+    tinha entrada no menu) pra criar tarefas soltas (ex.: "me enviar a nota fiscal"), vinculando
+    empresa e prazo, além das tarefas de correção que já caem aqui automaticamente. -->
+    <div class="fsnav conf-restrito conf-hidden" onclick="fiscalTab('tarefas',this)">📋 Tarefas <span id="fiscal-badge-tarefas-nav" style="display:none;margin-left:4px;background:rgba(245,158,11,.85);color:#1a1300;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;"></span></div>
     <div class="fsnav conf-restrito conf-hidden" onclick="fiscalTab('gerencial',this)">📈 Gerencial</div>
     <div class="fsnav" onclick="fiscalTab('calendario',this)">📅 Calendário</div>
     <div style="flex:1"></div>
@@ -2238,7 +2249,7 @@ planilha com CNPJ + responsável e atualiza, de uma vez, o "Resp. Fiscal" do cad
       <span id="fiscal-tarefas-titulo">📋 Minhas apurações, por imposto</span>
       <span id="fiscal-tarefas-filtro-ativo" style="display:none;font-weight:600;text-transform:none;letter-spacing:0;color:var(--cyan);cursor:pointer;" onclick="fopFiltrarPorImposto(null)">· filtrando <b id="fiscal-tarefas-filtro-nome"></b> — clique pra limpar ✕</span>
     </div>
-    <div id="fiscal-tarefas-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;"></div>
+    <div id="fiscal-tarefas-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;"></div>
   </div>
   <div id="fiscal-correcao-inline" style="display:none;padding:0 28px 8px;"></div>
 
@@ -3292,9 +3303,13 @@ function aplicarAcesso(user){
     el.style.pointerEvents = temAcesso ? '' : 'none';
     el.title = temAcesso ? '' : 'Acesso restrito';
   });
-  // Mostrar abas restritas (Conferencia/Finalizados/Gerencial/Calendario/Historico) so para conferentes
+  // Mostrar abas restritas (Configuração Fiscal/Correções/Tarefas/Gerencial) só para conferentes —
+  // mesma regra de fopIsConferente() (gestor "total", "acesso avançado ao Fiscal" cadastrado em
+  // Usuários, OU um dos 4 nomes fixos). Antes este checava só os 4 nomes fixos, então alguém com
+  // "acesso avançado ao Fiscal" marcado em Usuários via fiscalConferente, mas com outro nome, não via
+  // essas abas no menu mesmo tendo permissão internamente — corrigido pra usar a mesma regra.
   const _u=(user.usuario||'').toUpperCase();
-  const _ehConferente=_u==='NICOLAS'||_u==='MARILIA'||_u==='DIOGO'||_u==='MASTER';
+  const _ehConferente=!!(user.total || user.fiscalConferente) || _u==='NICOLAS'||_u==='MARILIA'||_u==='DIOGO'||_u==='MASTER';
   document.querySelectorAll('.conf-restrito').forEach(elx=>{
     if(_ehConferente) elx.classList.remove('conf-hidden'); else elx.classList.add('conf-hidden');
   });
@@ -3381,10 +3396,11 @@ const HUB_MODULOS = [
   {key:'rh',               icon:'👥', label:'RH'},
   {key:'dp',               icon:'📋', label:'DP'},
   {key:'contabil',         icon:'🧮', label:'Contábil'},
+  {key:'alvaras',          icon:'📜', label:'Alvarás e Licenças'},
 ];
 // Módulos "em desenvolvimento" — mesmo tratamento do 'conferencias': sempre visíveis pra todo
 // mundo, sem cadeado, sem checar permissão, só com o selo "Em breve" (ver renderHubModulos()).
-const HUB_MODULOS_EM_BREVE = ['conferencias','whatsapp','comunicados','monitor_contabil','portal_cliente','cofre_nf','financeiro','dp'];
+const HUB_MODULOS_EM_BREVE = ['conferencias','whatsapp','comunicados','monitor_contabil','portal_cliente','cofre_nf','financeiro','dp','alvaras'];
 
 function renderHubModulos(){
   const grid = document.getElementById('hub-modulos-grid');
@@ -10193,6 +10209,9 @@ async function carregarFiscalSupa(){
       renderFiscalTable();
     }
   } catch(e){ console.warn('Fiscal load:', e.message); }
+  // Biblioteca de checklists (aba Checklist): precisa estar carregada pra empresas vinculadas a um
+  // checklist personalizado (obrigação própria) mostrarem esse checklist na Apuração.
+  try{ if(!chkLista.length) await chkCarregar(); else fopChecklistsMudaram(); }catch(e){ console.warn('Checklists:', e.message); }
   // Sanitizar e gerar tarefas pendentes após carregar
   setTimeout(fopGerarTarefasPendentes, 300);
 }
@@ -10489,6 +10508,43 @@ let fopFiltroImposto = null;
 let fopFiltroImpBucket = null;
 // Ordem de exibição dos cards "por imposto" — mesma ordem já usada no painel de Obrigações do Gerencial
 const FOP_ORDEM_IMPOSTOS_CARD = ['pgdas','das_mei','icms','fundos','ipi','pis_cofins','iss','retidos','irpj_csll'];
+// ── CHECKLISTS PERSONALIZADOS COMO OBRIGAÇÃO PRÓPRIA ─────────────────────────
+// Diogo, 05/10/2026: "criamos um checklist novo [Filial outra contabilidade] lá dentro de Checklist,
+// porém ele não aparece na configuração de empresa — tem que aparecer pra eu vincular as empresas."
+// Escolha dele: o checklist vira uma OBRIGAÇÃO PRÓPRIA da empresa, igual ICMS/PIS-COFINS (aparece na
+// Apuração como mais um item, com os itens dele e o status dele). Todo checklist da biblioteca
+// (aba Checklist) cujo nome NÃO é de um imposto padrão (ICMS, IPI, PGDAS...) é "personalizado" e ganha
+// uma chave própria ('chk_' + id). A partir daí ele se comporta como qualquer obrigação: entra em
+// FOP_LABELS/FOP_CHECKLISTS/FOP_ORDEM_IMPOSTOS_CARD/FOP_IMPOSTOS e é vinculado por empresa na mesma
+// grade "Obrigações Fiscais Ativas" (fica salvo em config.impostos, junto com as 9 de sempre).
+let FOP_CHK_PERS = {}; // { 'chk_abc': {id, nome, itens} } — reconstruído por fopRegistrarChecklistsPersonalizados()
+const FOP_CHK_PALAVRAS_PADRAO = ['icms','fundos','ipi','pis','cofins','iss','retidos','irpj','csll','pgdas','das','mei'];
+function fopChkEhPadrao(nome){
+  const palavras=String(nome||'').toLowerCase().replace(/[\/\s_\-]+/g,' ').trim().split(' ');
+  return palavras.some(w=>FOP_CHK_PALAVRAS_PADRAO.includes(w));
+}
+function fopChkChave(id){ return 'chk_'+String(id).replace(/[^a-zA-Z0-9]/g,''); }
+function fopRegistrarChecklistsPersonalizados(){
+  let lista=[]; try{ lista=Array.isArray(chkLista)?chkLista:[]; }catch(e){ lista=[]; }
+  const novo={};
+  lista.forEach(c=>{
+    if(!c||c.id===undefined||c.id===null||String(c.id).startsWith('default_')) return;
+    if(fopChkEhPadrao(c.nome)) return;
+    novo[fopChkChave(c.id)]={id:c.id,nome:c.nome,itens:[...(c.itens||[])]};
+  });
+  // tira o que estava registrado antes (checklist renomeado/excluído) e registra de novo
+  Object.keys(FOP_CHK_PERS).forEach(k=>{
+    delete FOP_LABELS[k]; delete FOP_CHECKLISTS[k];
+    [FOP_ORDEM_IMPOSTOS_CARD,FOP_IMPOSTOS].forEach(arr=>{ const i=arr.indexOf(k); if(i>-1) arr.splice(i,1); });
+  });
+  FOP_CHK_PERS=novo;
+  Object.entries(novo).forEach(([k,v])=>{
+    FOP_LABELS[k]=v.nome; FOP_CHECKLISTS[k]=v.itens;
+    FOP_ORDEM_IMPOSTOS_CARD.push(k);
+    const iConf=FOP_IMPOSTOS.indexOf('conferencia');
+    FOP_IMPOSTOS.splice(iConf>-1?iConf:FOP_IMPOSTOS.length,0,k);
+  });
+}
 let fopFiltroTarefa = 'todos';
 let fopFiltroConf = 'disponivel_novo';
 let fopFiltroHist = 'todos';
@@ -10588,6 +10644,53 @@ async function fopSalvarChaveMesclada(chave, valorLocal, idsExcluidos){
   } catch(e){ /* não conseguiu buscar o remoto — segue e salva só o que tem local, como antes */ }
   return fopSalvarChave(chave, valorLocal);
 }
+// ── CONFIGURAÇÕES POR EMPRESA (fiscal_configs / contabil_configs) ─────────────
+// Diogo, 05/10/2026: "essas empresas já foram configuradas, porém elas voltam para a configuração e
+// não ficam lá em apuração." Causa raiz: fopSalvarChaveMesclada foi feita pra blobs "mês -> imposto"
+// (dois níveis) e trazia de volta, campo por campo, qualquer campo que o banco tivesse e a cópia local
+// não. Uma configuração de empresa é um registro "chato" (um nível só): quando a empresa tinha sido
+// resetada antes ({resetado:true, pendente:true} no banco) e depois era configurada de verdade, a
+// marca antiga de reset era misturada de volta na configuração nova — e ela voltava pra fila de
+// Configuração Fiscal. Aqui a regra é por empresa inteira: vale a versão MAIS RECENTE (configEm ou
+// resetadoEm); nunca se misturam campos de uma versão com a outra.
+function fopCfgTs(cfg){ return (cfg && (cfg.configEm || cfg.resetadoEm)) || ''; }
+// Cura registros já corrompidos pelo bug acima: uma configuração completa (tem configEm) NUNCA
+// deveria carregar a marca de reset/pendente — só o registro de reset puro ({resetado,pendente}, sem
+// configEm) é um reset de verdade. Retorna true se mudou alguma coisa.
+function fopCurarConfigs(obj){
+  let mudou=false;
+  Object.keys(obj||{}).forEach(k=>{
+    const c=obj[k];
+    if(c && typeof c==='object' && c.configEm && (c.resetado || c.pendente)){
+      delete c.resetado; delete c.pendente; mudou=true;
+    }
+  });
+  return mudou;
+}
+// Traz do banco (remoto) pro objeto local: empresa que o local não tem; ou empresa em que o remoto é
+// mais novo. Se o local for igual ou mais novo, o local vence (é o que a pessoa acabou de fazer).
+function fopMesclarConfigsRemoto(local, remoto, remotoVenceEmpate){
+  let mudou=false;
+  Object.keys(remoto||{}).forEach(k=>{
+    if(!(k in local)){ local[k]=remoto[k]; mudou=true; return; }
+    const tl=fopCfgTs(local[k]), tr=fopCfgTs(remoto[k]);
+    const remotoMaisNovo = tr>tl || (remotoVenceEmpate && tr===tl && JSON.stringify(local[k])!==JSON.stringify(remoto[k]));
+    if(remotoMaisNovo){ local[k]=remoto[k]; mudou=true; }
+  });
+  if(fopCurarConfigs(local)) mudou=true;
+  return mudou;
+}
+async function fopSalvarConfigsMesclado(chave, valorLocal){
+  try {
+    const { data } = await sb.from('configuracoes').select('valor').eq('chave', chave).maybeSingle();
+    if(data && data.valor){
+      const remoto = JSON.parse(data.valor);
+      if(remoto && typeof remoto==='object') fopMesclarConfigsRemoto(valorLocal, remoto, false);
+    }
+  } catch(e){ /* sem conseguir buscar o remoto, salva só o que tem local, como antes */ }
+  fopCurarConfigs(valorLocal);
+  return fopSalvarChave(chave, valorLocal);
+}
 function fopSalvar() {
   // Salvar localmente como fallback imediato
   try { localStorage.setItem('fopApur', JSON.stringify(fopApur)); } catch(e){}
@@ -10621,7 +10724,14 @@ function fopSalvar() {
   fopSalvarChave('fiscal_tarefas', fopTarefas);
   fopSalvarChave('fiscal_historico', fopHistorico);
   fopSalvarChave('fiscal_partic', fopParticOverride);
-  fopSalvarChave('fiscal_configs', fopFiscalConfigs);
+  // Diogo, 02/10/2026: "o Nicolas configurou a empresa e ficou pra Marília configurar também, não
+  // atualizou [...] se um configurou, já tem que sumir pro outro também." Causa raiz: isto aqui
+  // usava fopSalvarChave (sobrescrita cega). Se a aba de um conferente ficasse aberta com uma cópia
+  // desatualizada de fopFiscalConfigs e salvasse QUALQUER coisa (mesmo sem mexer em Configuração
+  // Fiscal — um checklist, por exemplo), a sobrescrita cega apagava de volta a configuração que o
+  // outro conferente tinha acabado de salvar. Trocado pra mesclagem segura (como fiscal_apur):
+  // nunca perde a configuração de ninguém, não importa a ordem dos salvamentos.
+  fopSalvarConfigsMesclado('fiscal_configs', fopFiscalConfigs);
   fopSalvarChaveMesclada('fiscal_prazos_internos', fopPrazosInternos);
   fopSalvarChave('fiscal_colaboradores', fopColaboradores);
   fopSalvarChave('fiscal_vencimentos_manuais', fopVencimentosManuais);
@@ -10636,7 +10746,9 @@ function fopSalvar() {
   // repetem entre os dois grupos — por isso reaproveita a mesma lápide fopApurExcluidos.
   fopSalvarChaveMesclada('fiscal_apur_acess', fopApurAcess, fopApurExcluidos);
   fopSalvarChave('fiscal_tempos', fopTempos);
-  fopSalvarChave('contabil_configs', contConfigs);
+  // Mesmo risco de sobrescrita cega do fiscal_configs acima (ver comentário) existe aqui no
+  // Contábil — mesma estrutura (configMap por CNPJ em contBuildClientes()) — por isso a mesma correção.
+  fopSalvarConfigsMesclado('contabil_configs', contConfigs);
   fopSalvarChave('contabil_colaboradores', contColaboradores);
   fopSalvarChave('contabil_checklists', contChkLista);
   fopSalvarChaveMesclada('contabil_apur', contApur);
@@ -10689,6 +10801,7 @@ async function fopCarregarSupa(){
       // ainda apareça na biblioteca (ex.: ficou "fantasma" salvo antes desta correção) é removido
       // aqui também, na hora de carregar — não só na hora de salvar.
       Object.keys(fopItensExtraLibExcluidos).forEach(id=>{ if(fopItensExtraLib[id]) delete fopItensExtraLib[id]; });
+      fopCurarConfigs(fopFiscalConfigs); fopCurarConfigs(contConfigs); // ver fopCurarConfigs
       // Mesma limpeza defensiva pra registros de apuração excluídos via "🗑️ Excluir Este Registro"
       // (chave composta "mesKey|imposto") — remove qualquer fantasma que tenha sobrado salvo, tanto
       // nas obrigações do mês (fopApur) quanto nas Acessórias (fopApurAcess, mesma lápide).
@@ -10702,6 +10815,44 @@ async function fopCarregarSupa(){
     }
   } catch(e){ console.warn('fopCarregarSupa:', e.message); }
   return false;
+}
+
+// Diogo, 02/10/2026: "tem que sempre atualizar após a configuração da empresa" — quem já está com
+// o Portal aberto (ex.: a Marília, numa aba que já estava logada antes do Nicolas configurar uma
+// empresa) só pegava a configuração nova do colega se recarregasse a página inteira. Esta função
+// busca só 'fiscal_configs'/'contabil_configs' no banco de tempos em tempos e atualiza na tela,
+// sem precisar de F5. Só troca localmente o que realmente mudou (evita re-render à toa) e nunca
+// sobrescreve o banco — é só leitura, bem mais leve que o fopCarregarSupa() completo do login.
+async function fopSincronizarConfigsRemoto(){
+  try{
+    const { data } = await sb.from('configuracoes').select('chave,valor').in('chave', ['fiscal_configs','contabil_configs']);
+    if(!data || !data.length) return;
+    let mudouFiscal=false, mudouContabil=false;
+    data.forEach(row=>{
+      if(!row.valor) return;
+      let remoto; try{ remoto=JSON.parse(row.valor); }catch(e){ return; }
+      if(!remoto || typeof remoto!=='object') return;
+      if(row.chave==='fiscal_configs'){
+        if(fopMesclarConfigsRemoto(fopFiscalConfigs, remoto, true)) mudouFiscal=true;
+      } else if(row.chave==='contabil_configs'){
+        if(fopMesclarConfigsRemoto(contConfigs, remoto, true)) mudouContabil=true;
+      }
+    });
+    if(mudouFiscal){
+      try{ localStorage.setItem('fopFiscalConfigs', JSON.stringify(fopFiscalConfigs)); }catch(e){}
+      if(document.getElementById('page-fiscal')?.classList.contains('active')){
+        if(typeof renderFiscalTable==='function') renderFiscalTable();
+        if(typeof fopRenderConfigFiscal==='function') fopRenderConfigFiscal();
+      }
+    }
+    if(mudouContabil){
+      try{ localStorage.setItem('contConfigs', JSON.stringify(contConfigs)); }catch(e){}
+      if(document.getElementById('page-contabil')?.classList.contains('active')){
+        if(typeof contRenderTable==='function') contRenderTable();
+        if(typeof contRenderConfigList==='function') contRenderConfigList();
+      }
+    }
+  }catch(e){ /* sincronização em segundo plano — falha aqui não deve incomodar o usuário */ }
 }
 function fopCarregar() {
   try { const d=localStorage.getItem('fopApur'); if(d) fopApur=JSON.parse(d); } catch(e){}
@@ -10730,6 +10881,7 @@ function fopCarregar() {
   try { const d=localStorage.getItem('contChkLista'); if(d) contChkLista=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('contApur'); if(d) contApur=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('contApurAcess'); if(d) contApurAcess=JSON.parse(d); } catch(e){}
+  fopCurarConfigs(fopFiscalConfigs); fopCurarConfigs(contConfigs); // ver fopCurarConfigs
   try { const d=localStorage.getItem('contTempos'); if(d) contTempos=JSON.parse(d); } catch(e){}
   if(!fopTempos || typeof fopTempos!=='object') fopTempos={ativos:{},registros:[]};
   if(!fopTempos.ativos) fopTempos.ativos={};
@@ -10881,7 +11033,7 @@ function fopImpostosPadraoPorRegime(empresa){
 // permite tirar (ou incluir) uma obrigação específica de uma empresa, tipo tirar "PIS/COFINS" e
 // "Retidos" de uma que não precisa. Sem configuração explícita, cai no cálculo automático por regime.
 function fopGetImpostos(empresa) {
-  if(Array.isArray(empresa.impostos)) return FOP_IMPS_CONFIG.filter(i=>empresa.impostos.includes(i));
+  if(Array.isArray(empresa.impostos)) return [...FOP_IMPS_CONFIG,...Object.keys(FOP_CHK_PERS)].filter(i=>empresa.impostos.includes(i));
   return fopImpostosPadraoPorRegime(empresa);
 }
 
@@ -11241,7 +11393,7 @@ function contSalvarConfigContabil(){
 }
 
 function contResetarConfigContabil(cnpj){
-  contConfigs[contNormCnpj(cnpj)]={resetado:true,pendente:true};
+  contConfigs[contNormCnpj(cnpj)]={resetado:true,pendente:true,resetadoEm:new Date().toISOString()};
   fopSalvar();
   document.getElementById('modal-config-contabil').classList.remove('open');
   contRenderTable();
@@ -12452,6 +12604,7 @@ function fopGerarTarefasPendentes(){
 
 async function fopAbrirConfigFiscal(cnpj){
   if(!chkLista.length) await chkCarregar();
+  fopRegistrarChecklistsPersonalizados();
   const c=(typeof opClientes!=='undefined'?opClientes:[]).find(x=>fopNormCnpj(x.cnpj)===fopNormCnpj(cnpj));
   if(!c){mostrarToast('Cliente não encontrado');return;}
   const modal=document.getElementById('modal-config-fiscal');
@@ -12476,13 +12629,13 @@ async function fopAbrirConfigFiscal(cnpj){
     // Ícone só de apoio visual (facilita bater o olho e achar a obrigação certa na grade) — não
     // tem nenhum efeito funcional, é puramente estético (pedido do Diogo: "deixar mais bonita").
     const _icone={icms:'📦',fundos:'🏛️',ipi:'🏭',pis_cofins:'💰',iss:'🏙️',retidos:'🔒',irpj_csll:'📊',pgdas:'🧮',das_mei:'🧑‍💼'};
-    grid.innerHTML=FOP_IMPS_CONFIG.map(imp=>{
+    grid.innerHTML=[...FOP_IMPS_CONFIG,...Object.keys(FOP_CHK_PERS)].map(imp=>{
       const marcado=impostosAtuais.includes(imp);
       return `
       <label class="mcf-imp-card" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:background .15s,border-color .15s;
         background:${marcado?"rgba(0,170,221,.12)":"var(--bg-card-hover)"};border:1px solid ${marcado?"var(--cyan)":"var(--border)"};">
-        <div style="font-size:15px;flex-shrink:0;">${_icone[imp]||'📄'}</div>
-        <div style="font-size:12.5px;font-weight:700;color:var(--text-primary);flex:1;">${FOP_LABELS[imp]||imp}</div>
+        <div style="font-size:15px;flex-shrink:0;">${_icone[imp]||'📑'}</div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--text-primary);flex:1;">${FOP_LABELS[imp]||imp}${FOP_CHK_PERS[imp]?' <span style="font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;">· checklist próprio</span>':''}</div>
         <input type="checkbox" name="mcf-imp" value="${imp}" ${marcado?"checked":""} onchange="fopMcfImpVisual(this)"
           style="width:17px;height:17px;flex-shrink:0;accent-color:var(--cyan);cursor:pointer;">
       </label>`;
@@ -12699,21 +12852,46 @@ function fopToggleSemFiscal(val){
 }
 
 
+// Diogo, 02/10/2026: antes este painel (aberto pelo badge "⏳ X tarefas pendentes" no topo do
+// Fiscal) só mostrava tarefas de tipo 'config_fiscal' — mas o número do badge (pTar, calculado em
+// renderFiscalTable) já contava TODAS as tarefas não concluídas, incluindo correções e as tarefas
+// avulsas novas (ver fopAbrirNovaTarefa). Um analista (não-conferente, que não tem acesso à aba
+// "📋 Tarefas" lá em cima) clicava no badge e não via a tarefa que o número prometia. Generalizado
+// pra mostrar os 3 tipos, cada um com a ação que faz sentido pra ele.
 function fopAbrirPainelTarefas(){
-  const tarefas=fopTarefas.filter(t=>t.tipo==='config_fiscal'&&t.status!=='concluido');
+  const _userRespBadge=(typeof usuarioLogado!=='undefined'&&usuarioLogado&&usuarioLogado.fiscalResp)||null;
+  const tarefas=fopTarefas.filter(t=>t.status!=='concluido'&&(!_userRespBadge||(t.responsavel||'').toUpperCase().includes(_userRespBadge.toUpperCase())));
   const el=document.getElementById('painel-tarefas-lista');
   if(!el) return;
   if(!tarefas.length){
     el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Nenhuma tarefa pendente.</div>';
   } else {
+    const canConf=fopIsConferente();
+    const hojeISO=new Date().toISOString().slice(0,10);
     el.innerHTML=tarefas.map(t=>{
-      const canConf=fopIsConferente();
-      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text-primary);">${t.empresa||t.cnpj}</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Responsável: Nicolas e Marília</div>
+      if(t.tipo==='config_fiscal'){
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);">${t.empresa||t.cnpj}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">⚙️ Configurar dados fiscais · Responsável: Nicolas e Marília</div>
+          </div>
+          ${canConf?`<button onclick="document.getElementById('modal-painel-tarefas').classList.remove('open');fopAbrirConfigFiscal('${t.cnpj}')" style="flex-shrink:0;padding:5px 14px;border-radius:8px;background:rgba(0,170,221,.12);border:1px solid rgba(0,170,221,.35);color:var(--cyan);font-size:12px;font-weight:600;cursor:pointer;">⚙ Configurar</button>`:''}
+        </div>`;
+      }
+      // tipo 'correcao' (criada por fopConfirmarCorrecao) ou 'manual' (tarefa avulsa — ver
+      // fopAbrirNovaTarefa): mesmo cartão, só muda a cor/rótulo e o que é mostrado como descrição.
+      const ehCorrecao=t.tipo==='correcao';
+      const atrasada=t.prazo&&t.prazo<hojeISO;
+      const descricao=t.motivo||t.descricao||'';
+      return `<div style="padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.empresa||t.cnpj}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${ehCorrecao?`🔴 Correção${t.imposto?' · '+(FOP_LABELS[t.imposto]||t.imposto):''}`:'📝 Tarefa avulsa'}${t.prazo?` · ${atrasada?'<span style="color:var(--red);font-weight:700;">⚠️ Atrasada — ':'Prazo: '}${new Date(t.prazo+'T00:00:00').toLocaleDateString('pt-BR')}${atrasada?'</span>':''}`:''}</div>
+          </div>
+          <button onclick="fopAtualizarTarefa(${t.id},'concluido');fopAbrirPainelTarefas();" style="flex-shrink:0;padding:5px 14px;border-radius:8px;background:rgba(0,200,150,.12);border:1px solid rgba(0,200,150,.35);color:var(--green);font-size:12px;font-weight:600;cursor:pointer;">✅ Concluído</button>
         </div>
-        ${canConf?`<button onclick="document.getElementById('modal-painel-tarefas').classList.remove('open');fopAbrirConfigFiscal('${t.cnpj}')" style="flex-shrink:0;padding:5px 14px;border-radius:8px;background:rgba(0,170,221,.12);border:1px solid rgba(0,170,221,.35);color:var(--cyan);font-size:12px;font-weight:600;cursor:pointer;">⚙ Configurar</button>`:''}
+        ${descricao?`<div style="font-size:11.5px;color:var(--text-primary);background:${ehCorrecao?'rgba(255,77,106,.08)':'var(--bg-card-hover)'};border-left:2px solid ${ehCorrecao?'var(--red)':'var(--border-acc)'};padding:6px 8px;border-radius:4px;margin-top:8px;">${descricao}</div>`:''}
       </div>`;
     }).join('');
   }
@@ -12722,7 +12900,7 @@ function fopAbrirPainelTarefas(){
 
 function fopResetarConfigFiscal(cnpj){
   const k=fopNormCnpj(cnpj);
-  fopFiscalConfigs[k]={resetado:true,pendente:true};
+  fopFiscalConfigs[k]={resetado:true,pendente:true,resetadoEm:new Date().toISOString()};
   fopTarefas.forEach(t=>{
     if(t.tipo==='config_fiscal'&&fopNormCnpj(t.cnpj)===k) t.status='a_fazer';
   });
@@ -13210,6 +13388,11 @@ function renderFiscalTable() {
   const bfNav=document.getElementById('badge-fiscal'); if(bfNav){bfNav.textContent=kPend;bfNav.style.display=kPend>0?'inline':'none';}
   const kCfgPend=_baseResp.filter(c=>c.pendente).length;
   const bcfg=document.getElementById('fiscal-badge-cfg'); if(bcfg){bcfg.textContent=kCfgPend;bcfg.style.display=kCfgPend?'':'none';}
+  // Badges dos novos itens do menu de cima (ver fopAbrirCorrecoesTab) — rCorr já é "empresas em
+  // correção" e pTar já é "tarefas não concluídas", calculados acima; pra conferente (fiscalResp
+  // vazio) os dois já saem contando o sistema inteiro, que é exatamente o que os botões mostram.
+  const bCorrNav=document.getElementById('fiscal-badge-correcoes'); if(bCorrNav){bCorrNav.textContent=rCorr;bCorrNav.style.display=rCorr?'':'none';}
+  const bTarNav=document.getElementById('fiscal-badge-tarefas-nav'); if(bTarNav){bTarNav.textContent=pTar;bTarNav.style.display=pTar?'':'none';}
 
   const tituloResumo=document.getElementById('fiscal-resumo-titulo');
   if(tituloResumo) tituloResumo.textContent=_userResp?`📌 Minhas empresas (${_userResp})`:'📌 Empresas — todas';
@@ -13254,24 +13437,28 @@ function renderFiscalTable() {
         const d=resumoTarefa[imp];
         const ativoApurar=fopFiltroImposto===imp&&fopFiltroImpBucket==='apurar';
         const ativoConf=fopFiltroImposto===imp&&fopFiltroImpBucket==='conf';
+        const ativoCorr=fopFiltroImposto===imp&&fopFiltroImpBucket==='corr';
         const ativoFin=fopFiltroImposto===imp&&fopFiltroImpBucket==='fin';
         return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:9px 11px;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px;">
             <div style="font-weight:800;font-size:11.5px;">${FOP_LABELS[imp]||imp}</div>
-            ${d.corr>0?`<div onclick="fopFiltrarPorImposto('${imp}','corr')" title="Empresas que voltaram pra correção" style="cursor:pointer;font-size:9px;font-weight:700;color:var(--red);background:rgba(255,92,122,.12);padding:1px 6px;border-radius:20px;white-space:nowrap;">🔴 ${d.corr} correção</div>`:''}
           </div>
-          <div style="display:flex;gap:6px;">
-            <div onclick="fopFiltrarPorImposto('${imp}','apurar')" title="Ainda falta apurar" style="cursor:pointer;flex:1;text-align:center;background:${ativoApurar?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoApurar?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">
+            <div onclick="fopFiltrarPorImposto('${imp}','apurar')" title="Ainda falta apurar" style="cursor:pointer;text-align:center;background:${ativoApurar?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoApurar?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
               <div style="font-size:15px;font-weight:800;color:var(--yellow);line-height:1;">${d.apurar}</div>
-              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;">⏳ A Apurar</div>
+              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;white-space:nowrap;">⏳ A Apurar</div>
             </div>
-            <div onclick="fopFiltrarPorImposto('${imp}','conf')" title="Aguardando aprovação da conferência" style="cursor:pointer;flex:1;text-align:center;background:${ativoConf?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoConf?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
+            <div onclick="fopFiltrarPorImposto('${imp}','conf')" title="Aguardando aprovação da conferência" style="cursor:pointer;text-align:center;background:${ativoConf?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoConf?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
               <div style="font-size:15px;font-weight:800;color:var(--cyan);line-height:1;">${d.conf}</div>
-              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;">🔍 Conferência</div>
+              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;white-space:nowrap;">🔍 Conferência</div>
             </div>
-            <div onclick="fopFiltrarPorImposto('${imp}','fin')" title="Já finalizadas" style="cursor:pointer;flex:1;text-align:center;background:${ativoFin?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoFin?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
+            <div onclick="fopFiltrarPorImposto('${imp}','corr')" title="Empresas que voltaram pra correção" style="cursor:pointer;text-align:center;background:${ativoCorr?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoCorr?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
+              <div style="font-size:15px;font-weight:800;color:var(--red);line-height:1;">${d.corr}</div>
+              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;white-space:nowrap;">🔴 Correção</div>
+            </div>
+            <div onclick="fopFiltrarPorImposto('${imp}','fin')" title="Já finalizadas" style="cursor:pointer;text-align:center;background:${ativoFin?'var(--cyan-glow)':'transparent'};border:1px solid ${ativoFin?'rgba(0,170,221,.45)':'var(--border)'};border-radius:7px;padding:6px 4px;">
               <div style="font-size:15px;font-weight:800;color:var(--green);line-height:1;">${d.fin}</div>
-              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;">✅ Finalizado</div>
+              <div style="font-size:8.5px;color:var(--text-muted);margin-top:3px;white-space:nowrap;">✅ Finalizado</div>
             </div>
           </div>
         </div>`;
@@ -13611,6 +13798,95 @@ function fopAplicarPreferenciaDashboard(){
     correcao.style.display=(!fopDashResumoMinimizado && fopCorrecaoInlineAberto)?'block':'none';
   }
   if(btn) btn.innerHTML=fopDashResumoMinimizado?'▼ Mostrar resumo':'▲ Minimizar';
+}
+
+// ── MANUAL / AJUDA DO FISCAL ────────────────────────────────────────────────
+// Diogo, 02/10/2026: "tem como fazer um manual de toda essa parte fiscal?" — como explicado
+// no chat, hoje não existe (e não é viável sem custo) um assistente de IA de verdade rodando
+// dentro do Portal; isso aqui é a versão gratuita e imediata: um manual pesquisável, dentro do
+// próprio módulo Fiscal, com as dúvidas mais comuns já respondidas. A busca filtra por
+// pergunta, resposta e categoria ao mesmo tempo, e some os problemas que não baterem.
+const FOP_MANUAL = [
+  {cat:'📊 Apurações', p:'Como eu marco um imposto como apurado?', r:'Clique no card da empresa e depois no imposto (PGDAS, ICMS, ISS etc.). Abre um checklist — marque os itens um a um conforme for fazendo. O status avança sozinho conforme você marca os itens.'},
+  {cat:'📊 Apurações', p:'Pra que serve o cronômetro dentro do checklist?', r:'Ele mede quanto tempo o analista gasta trabalhando naquela empresa/imposto. Dá pra pausar e retomar depois. Esse tempo acumulado aparece no relatório "⏱ Tempo por Cliente" (visível só pra quem tem acesso de conferente).'},
+  {cat:'📊 Apurações', p:'Dá pra mudar a ordem dos itens do checklist de uma empresa?', r:'Sim. Dentro de "⚙️ Configurar Fiscal" da empresa dá pra reordenar os itens do checklist daquele imposto. A nova ordem vale dali pra frente.'},
+  {cat:'📊 Apurações', p:'A empresa tem uma particularidade que não está no checklist padrão. Como eu adiciono?', r:'Em "⚙️ Configurar Fiscal" da empresa tem a opção de adicionar "itens extra" só pra aquele imposto, daquela empresa específica — sem mexer no checklist padrão das outras empresas.'},
+  {cat:'📊 Apurações', p:'Por que o PGDAS tem 3 etapas e os outros impostos não?', r:'O PGDAS (Simples Nacional) passa por 3 etapas: 1) Rotina Automática, 2) Conferência, 3) Disponibilização dos documentos/resultado. Pra passar da 1 pra 2, marque "Conferência Realizada por Completo". Pra passar da 2 pra 3, marque "Disponibilizar os documentos e resultados da apuração" (só Marília, Nicolas ou Diogo podem fazer essa etapa). Depois, "Enviar ao NIBO" manda pra conferência final.'},
+  {cat:'📊 Apurações', p:'Lancei um imposto no mês errado por engano. Como eu apago?', r:'Abra o checklist daquele imposto e clique em "🗑️ Excluir Este Registro" (só aparece pra conferentes: Diogo, Marília, Nicolas ou quem tiver acesso avançado). O sistema pede pra digitar a palavra EXCLUIR pra confirmar. Atenção: isso apaga o lançamento de vez, sem guardar histórico — é diferente do botão de Correção.'},
+  {cat:'📊 Apurações', p:'Qual a diferença entre "🔴 Correção" e "🗑️ Excluir Este Registro"?', r:'Correção é pra quando o trabalho foi feito errado, mas no mês certo — ela cria uma tarefa pro responsável refazer, guardando o histórico. Excluir apaga o lançamento inteiro, como se nunca tivesse existido — use só quando foi um lançamento indevido mesmo (mês trocado, duplicado etc.).'},
+  {cat:'📊 Apurações', p:'Como funciona a correção quando um conferente reprova um imposto?', r:'O conferente clica em reprovar, escreve o motivo (e pode anexar um print) e confirma. Isso cria uma tarefa pro responsável daquele imposto. A pessoa vê a tarefa, pode anexar seu próprio print e, quando resolver, clica em "✅ Corrigido" — aí o item volta pra fila de conferência.'},
+  {cat:'📊 Apurações', p:'O que significa aquele número azul no canto superior direito?', r:'É a quantidade de obrigações (não empresas) esperando conferência no momento, somando todas as empresas. É diferente do card "Em Conferência" do dashboard, que conta empresas, não obrigações individuais.'},
+  {cat:'📊 Apurações', p:'Tem como esconder os cards de resumo e deixar só a lista de empresas na tela?', r:'Sim — tem um botão "▲ Minimizar" em cima dos cards de resumo. Ele esconde os cards de resumo e os cards por imposto juntos, sem mexer na lista/cards das empresas. A preferência fica salva: da próxima vez que você abrir o Portal, continua do jeito que você deixou.'},
+  {cat:'🗂️ Obrigações Acessórias', p:'Quais obrigações acessórias o sistema controla?', r:'EFD Contribuições, EFD-Reinf, MIT, SPED Fiscal, SINTEGRA e DeSTDA. O sistema decide sozinho quais se aplicam a cada empresa, de acordo com o regime tributário, se tem Inscrição Estadual e o tipo de filial.'},
+  {cat:'🗂️ Obrigações Acessórias', p:'O checklist das Obrigações Acessórias funciona igual ao das Apurações?', r:'É mais simples: só tem duas opções — "Enviado" ou "Sem Movimento". Não existe uma etapa separada de conferência como no PGDAS.'},
+  {cat:'⚙️ Configuração Fiscal', p:'Como eu troco o responsável de uma empresa?', r:'Vá em "⚙️ Configurar Fiscal" da empresa e troque o campo "Responsável do mês". Só aparecem colaboradores marcados como ativos — se alguém não aparecer na lista, confira em "👥 Colaboradores" se a pessoa está ativa.'},
+  {cat:'⚙️ Configuração Fiscal', p:'O que é o campo "% TTD" na configuração da empresa?', r:'É o percentual do benefício fiscal TTD 409 (um tratamento tributário diferenciado de ICMS). Quando esse campo está preenchido, o sistema adiciona automaticamente um item extra no checklist de ICMS: "Conferência Benefício Fiscal TTD 409".'},
+  {cat:'⚙️ Configuração Fiscal', p:'Como importo uma planilha de responsáveis pra atualizar várias empresas de uma vez?', r:'No topo da tela de Apurações tem o botão "📥 Importar Responsáveis (Excel)". Ele lê uma planilha com CNPJ + responsável e atualiza tanto o "Responsável do mês" no Fiscal quanto o "Resp. Fiscal" lá em Clientes. Se o CNPJ da planilha estiver diferente do cadastrado mas o código da empresa bater, o sistema avisa e usa o código como alternativa — sem corrigir o CNPJ sozinho.'},
+  {cat:'⚙️ Configuração Fiscal', p:'Lá em Clientes, a coluna "Fiscal" está desatualizada. Como eu corrijo isso de uma vez?', r:'Em Clientes (Operação) tem o botão "🔄 Sincronizar Resp. Fiscal". Ele mostra uma prévia de quais empresas estão com o responsável diferente entre as duas telas e, ao confirmar, atualiza a coluna de Clientes com o valor certo que está no Fiscal.'},
+  {cat:'📈 Gerencial', p:'O que tem dentro da aba Gerencial?', r:'Duas partes: "Visão Geral" (o dashboard fiscal com os números gerais de todas as empresas) e "Metas Internas" (prazos internos negociados, diferentes das datas oficiais do governo). Essa aba só aparece pra Diogo, Marília, Nicolas e Master.'},
+  {cat:'📅 Calendário', p:'Qual a diferença entre o Calendário Fiscal e o Calendário Interno?', r:'O Calendário Fiscal mostra as datas oficiais de vencimento de cada obrigação junto ao governo (conferentes podem ajustar manualmente se precisar). O Calendário Interno mostra os prazos negociados internamente pela equipe (Metas Internas), que costumam ser antes do prazo oficial pra dar uma folga de segurança.'},
+  {cat:'⏱ Tempo por Cliente', p:'Pra que serve o relatório "⏱ Tempo por Cliente"?', r:'Mostra quanto tempo cada colaborador gastou em cada empresa, somando os cronômetros usados nos checklists (inclusive o que estiver rodando agora, se tiver algum aberto). Só visível pra conferentes.'},
+  {cat:'🔍 Auditoria Fiscal', p:'Pra que serve o botão "🔍 Auditoria Fiscal"?', r:'Mostra uma lista de clientes ativos que ainda não têm configuração no Fiscal, ou que já têm configuração mas estão sem um responsável definido — pra não esquecer nenhuma empresa sem acompanhamento.'},
+  {cat:'👥 Colaboradores', p:'Como eu adiciono, renomeio ou desativo um colaborador do Fiscal?', r:'No modal "👥 Colaboradores" dá pra adicionar um novo nome, renomear um já existente (o sistema atualiza esse nome automaticamente em todas as empresas que já tinham ele como responsável), e ativar/desativar ou remover. Só colaboradores ativos aparecem pra escolher como "Responsável do mês".'},
+  {cat:'🔒 Acessos', p:'Quem pode excluir um registro, fazer a conferência final ou acessar Configuração/Gerencial?', r:'Esses recursos são exclusivos de quem tem acesso de conferente: Diogo, Marília, Nicolas, Master, ou qualquer usuário marcado como "acesso total" ou com "acesso avançado ao Fiscal" habilitado na tela de Usuários.'},
+  {cat:'🤖 Assistente de IA', p:'Existe um assistente de IA dentro do Portal que responde dúvidas?', r:'Ainda não. Hoje esse manual é a forma de tirar dúvidas dentro do próprio sistema. Um assistente de IA de verdade (que responde qualquer pergunta livremente) existe como possibilidade futura, mas depende de uma chave de acesso de um provedor de IA e tem um custo por pergunta — fale com o Diogo se quiser avançar nisso.'},
+];
+
+function fopAbrirAjuda(){
+  let m=document.getElementById('modal-fop-ajuda');
+  if(!m){ m=document.createElement('div'); m.id='modal-fop-ajuda'; m.className='modal-overlay'; m.onclick=function(e){ if(e.target===this) this.classList.remove('open'); }; document.body.appendChild(m); }
+  m.innerHTML=`<div class="modal" style="max-width:640px;width:92%;max-height:85vh;display:flex;flex-direction:column;">
+    <div class="modal-header">
+      <div><div class="modal-title">❓ Ajuda / Manual do Fiscal</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Busque sua dúvida abaixo — ex: "excluir", "cronômetro", "responsável"</div></div>
+      <button class="modal-close" onclick="document.getElementById('modal-fop-ajuda').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:14px 20px 0;flex-shrink:0;">
+      <div class="search-wrap">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-input" id="fop-ajuda-busca" placeholder="Digite sua dúvida..." oninput="fopRenderAjuda(this.value)" autocomplete="off">
+      </div>
+    </div>
+    <div id="fop-ajuda-lista" style="padding:14px 20px 20px;overflow-y:auto;flex:1;"></div>
+  </div>`;
+  m.classList.add('open');
+  fopRenderAjuda('');
+  setTimeout(()=>document.getElementById('fop-ajuda-busca')?.focus(),50);
+}
+
+// Redesenha a lista do manual filtrada pelo texto digitado — procura em pergunta, resposta e
+// categoria ao mesmo tempo. Sem busca, mostra tudo fechado, agrupado por categoria; buscando,
+// já mostra as respostas abertas direto (pra não precisar clicar de novo em cada uma).
+function fopRenderAjuda(filtro){
+  const lista=document.getElementById('fop-ajuda-lista');
+  if(!lista) return;
+  const termo=(filtro||'').trim().toLowerCase();
+  const itens = termo ? FOP_MANUAL.filter(it=> (it.p+' '+it.r+' '+it.cat).toLowerCase().includes(termo)) : FOP_MANUAL;
+  if(!itens.length){
+    lista.innerHTML = `<div style="text-align:center;padding:30px 10px;color:var(--text-muted);">
+      <div style="font-size:30px;margin-bottom:8px;">🤷</div>
+      <p style="font-size:12.5px;">Não achei nada com "${fopEscapeHtml(termo)}". Tenta outra palavra, ou chama o Diogo.</p>
+    </div>`;
+    return;
+  }
+  const categorias=[];
+  itens.forEach(it=>{ if(!categorias.includes(it.cat)) categorias.push(it.cat); });
+  const abrirTudo = !!termo;
+  lista.innerHTML = categorias.map(cat=>`
+    <div style="margin-bottom:16px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">${cat}</div>
+      ${itens.filter(it=>it.cat===cat).map((it,idx)=>{
+        const id='fop-ajuda-item-'+cat.replace(/[^a-zA-Z0-9]/g,'')+'-'+idx;
+        return `<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden;">
+          <div onclick="(function(){var r=document.getElementById('${id}');r.style.display=r.style.display==='none'?'block':'none';})()" style="padding:10px 12px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-primary);background:var(--bg-card);">❓ ${it.p}</div>
+          <div id="${id}" style="display:${abrirTudo?'block':'none'};padding:10px 12px;font-size:12px;color:var(--text-secondary);line-height:1.5;border-top:1px solid var(--border);">${it.r}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+// Escapa texto simples pra não quebrar o HTML quando ecoado de volta (ex.: "não achei nada com...")
+function fopEscapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 let fopCorrecaoInlineAberto=false;
@@ -14240,7 +14516,7 @@ function fopAbrirModal(cnpj, imposto, fam){
           <button onclick="fopIniciarTempo('${cnpj}','${imposto}','${fam||''}')" style="padding:9px 14px;border-radius:8px;background:rgba(0,200,150,.15);border:1px solid rgba(0,200,150,.3);color:var(--green);font-weight:700;cursor:pointer;font-size:12.5px;white-space:nowrap;">▶ Iniciar Apuração</button>
         </div>`;
       })()}
-      ${items.length?`<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Checklist (${_fopChkCount.done}/${_fopChkCount.total})</div>${!_cronOk?`<div style="font-size:11px;color:var(--yellow);margin-bottom:8px;">🔒 ${fopTempoAtivo(cnpj,imposto,fam)?'Cronômetro pausado — clique em "▶ Retomar" acima':'Inicie o cronômetro acima antes de marcar o checklist'}</div>`:''}${ckHtml}<div style="height:14px;"></div>`:''}
+      ${items.length?`<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Checklist (${_fopChkCount.done}/${_fopChkCount.total})</div>${(FOP_CHK_PERS[imposto]&&!items.includes('Postado no NIBO'))?`<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">📑 Ao marcar todos os itens, esta obrigação vai automaticamente para a Conferência.</div>`:''}${!_cronOk?`<div style="font-size:11px;color:var(--yellow);margin-bottom:8px;">🔒 ${fopTempoAtivo(cnpj,imposto,fam)?'Cronômetro pausado — clique em "▶ Retomar" acima':'Inicie o cronômetro acima antes de marcar o checklist'}</div>`:''}${ckHtml}<div style="height:14px;"></div>`:''}
       <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Observações</div>
       <textarea id="fop-obs-${cnpj}-${imposto}" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--text-primary);outline:none;resize:vertical;min-height:56px;">${d.obs||''}</textarea>
       ${!isAcess&&isDisp&&fopIsConferente()?`<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
@@ -14437,6 +14713,27 @@ function fopCheckItem(cnpj, imposto, idx, val, fam){
       fopLog(empresa?.nome||cnpj,cnpj,imposto,'NIBO desmarcado','Status volta para '+(aindaTemItem?'Em Apuração':'Não iniciado'));
     }
     fopSalvar(); _render(); return;
+  }
+
+  // Checklist personalizado (ver FOP_CHK_PERS): não tem o item "Postado no NIBO" que avisa que acabou —
+  // então, ao marcar o ÚLTIMO item, a obrigação vai sozinha pra Conferência (igual o NIBO faz nas
+  // outras); se desmarcar algum depois, volta pra Em Apuração. Se o Diogo incluir "Postado no NIBO" ou
+  // "Sem Movimento" nesse checklist, valem as regras normais (os blocos acima já resolveram).
+  if(FOP_CHK_PERS[imposto]&&!items.includes('Postado no NIBO')){
+    const _cnt=fopChecklistCount(items,d.checklist);
+    if(_cnt.total>0&&_cnt.done>=_cnt.total){
+      if(d.status!=='disponivel'){
+        d.status='disponivel';
+        fopLog(empresa?.nome||cnpj,cnpj,imposto,'Checklist completo','Status → Disponível para Conferência');
+      }
+      fopSalvar(); _render(); return;
+    }
+    if(d.status==='disponivel'){
+      const _aindaTem=d.checklist.some(v=>v);
+      d.status=_aindaTem?'apurando':'';
+      fopLog(empresa?.nome||cnpj,cnpj,imposto,'Item desmarcado','Status volta para '+(_aindaTem?'Em Apuração':'Não iniciado'));
+      fopSalvar(); _render(); return;
+    }
   }
 
   if(val && (d.status===''||!d.status)){
@@ -14649,44 +14946,93 @@ function fopConfirmarExclusaoRegistro(){
 }
 
 // ── MÓDULO 4: TAREFAS ────────────────────────────────────────────────────────
+// Diogo, 02/10/2026: "tenho algumas tarefas avulsas que preciso criar para eles. Por exemplo...
+// me enviar a nota fiscal... crio essa tarefa, vinculo a empresa e vinculo uma data pra eles me
+// mandarem isso." Duas mudanças: o Imposto/Obrigação virou opcional (ganhou uma opção "— Tarefa
+// avulsa —" pra quando não tem nada a ver com nenhum imposto específico) e entrou o campo Prazo
+// (data limite) — que a tarefa não tinha antes.
+// Diogo, 02/10/2026: "nesse teste eu verifiquei que a gente vai precisar de um botão editar e
+// excluir. Porque se eu fizer alguma coisa errada, eu tenho a possibilidade de editar ou excluir
+// essa tarefa" — o mesmo modal de "+ Nova Tarefa" agora serve pros dois casos: chamado sem id cria
+// uma tarefa nova, chamado com o id de uma tarefa avulsa existente (fopAbrirEditarTarefa) abre em
+// modo edição, já preenchido, e salva em cima da mesma tarefa em vez de criar outra.
+let fopTarefaEditandoId=null;
 function fopAbrirNovaTarefa(){
+  fopTarefaEditandoId=null;
+  fopMontarModalTarefa();
+}
+function fopAbrirEditarTarefa(id){
+  const t=fopTarefas.find(x=>x.id===id);
+  if(!t||t.tipo!=='manual') return; // edição só faz sentido pra tarefa avulsa — correção/config fiscal têm fluxo próprio
+  fopTarefaEditandoId=id;
+  fopMontarModalTarefa(t);
+}
+function fopMontarModalTarefa(t){
   const base=fopBuildClientes().filter(c=>!c.pendente);
   let m=document.getElementById('modal-nova-tarefa');
   if(!m){ m=document.createElement('div'); m.id='modal-nova-tarefa'; m.className='modal-overlay'; document.body.appendChild(m); }
+  const editando=!!t;
   m.innerHTML=`<div class="modal" style="max-width:480px;width:90%;">
     <div class="modal-header">
-      <div style="font-size:15px;font-weight:700;">+ Nova Tarefa</div>
+      <div style="font-size:15px;font-weight:700;">${editando?'✏️ Editar Tarefa':'+ Nova Tarefa'}</div>
       <button class="modal-close" onclick="document.getElementById('modal-nova-tarefa').classList.remove('open')">✕</button>
     </div>
     <div style="padding:16px 20px;">
       <label style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Empresa</label>
       <select id="ntf-empresa" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);margin:6px 0 12px;">
-        ${base.map(c=>`<option value="${c.cnpj}">#${c.cod} — ${c.nome}</option>`).join('')}
+        ${base.map(c=>`<option value="${c.cnpj}" ${editando&&fopNormCnpj(c.cnpj)===fopNormCnpj(t.cnpj)?'selected':''}>#${c.cod} — ${c.nome}</option>`).join('')}
       </select>
-      <label style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Imposto/Obrigação</label>
+      <label style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Imposto/Obrigação (opcional)</label>
       <select id="ntf-imposto" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);margin:6px 0 12px;">
-        ${FOP_IMPOSTOS.map(i=>`<option value="${i}">${FOP_LABELS[i]}</option>`).join('')}
+        <option value="" ${editando&&!t.imposto?'selected':''}>— Tarefa avulsa (sem imposto específico) —</option>
+        ${FOP_IMPOSTOS.map(i=>`<option value="${i}" ${editando&&t.imposto===i?'selected':''}>${FOP_LABELS[i]}</option>`).join('')}
       </select>
+      <label style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Prazo (opcional)</label>
+      <input id="ntf-prazo" type="date" value="${editando&&t.prazo?t.prazo:''}" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);margin:6px 0 12px;">
       <label style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Descrição da tarefa</label>
-      <textarea id="ntf-motivo" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);margin:6px 0 12px;min-height:70px;" placeholder="O que precisa ser feito..."></textarea>
-      <button onclick="fopSalvarNovaTarefa()" style="width:100%;padding:10px;border-radius:8px;background:var(--cyan-glow);border:1px solid rgba(0,170,221,.3);color:var(--cyan);font-weight:700;cursor:pointer;">Criar Tarefa</button>
+      <textarea id="ntf-motivo" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);margin:6px 0 12px;min-height:70px;" placeholder="Ex.: Me enviar a nota fiscal de outubro...">${editando?(t.motivo||''):''}</textarea>
+      <button onclick="fopSalvarNovaTarefa()" style="width:100%;padding:10px;border-radius:8px;background:var(--cyan-glow);border:1px solid rgba(0,170,221,.3);color:var(--cyan);font-weight:700;cursor:pointer;">${editando?'Salvar Alterações':'Criar Tarefa'}</button>
     </div>
   </div>`;
   m.classList.add('open');
 }
 function fopSalvarNovaTarefa(){
   const cnpj=document.getElementById('ntf-empresa').value;
-  const imposto=document.getElementById('ntf-imposto').value;
+  const imposto=document.getElementById('ntf-imposto').value||null;
+  const prazo=document.getElementById('ntf-prazo').value||null;
   const motivo=(document.getElementById('ntf-motivo').value||'').trim();
   if(!motivo){ alert('Descreva a tarefa.'); return; }
   const empresa=fopBuildClientes().find(c=>fopNormCnpj(c.cnpj)===fopNormCnpj(cnpj));
-  fopTarefas.push({id:Date.now(),cnpj,empresa:empresa?.nome||cnpj,imposto,
-    responsavel:empresa?.respMes||'—',status:'a_fazer',motivo,tipo:'manual',
-    mesKey:fopGetKey(cnpj),criadoEm:new Date().toISOString(),criadoPor:fopGetUsuario()});
+  if(fopTarefaEditandoId){
+    const t=fopTarefas.find(x=>x.id===fopTarefaEditandoId);
+    if(t){
+      Object.assign(t,{cnpj,empresa:empresa?.nome||cnpj,imposto,prazo,
+        responsavel:empresa?.respMes||t.responsavel,motivo,
+        mesKey:fopGetKey(cnpj),editadoEm:new Date().toISOString(),editadoPor:fopGetUsuario()});
+    }
+    fopTarefaEditandoId=null;
+    mostrarToast('✅ Tarefa atualizada');
+  } else {
+    fopTarefas.push({id:Date.now(),cnpj,empresa:empresa?.nome||cnpj,imposto,prazo,
+      responsavel:empresa?.respMes||'—',status:'a_fazer',motivo,tipo:'manual',
+      mesKey:fopGetKey(cnpj),criadoEm:new Date().toISOString(),criadoPor:fopGetUsuario()});
+    mostrarToast('✅ Tarefa criada com sucesso');
+  }
   fopSalvar();
   document.getElementById('modal-nova-tarefa')?.classList.remove('open');
   fopRenderTarefas();
-  mostrarToast('✅ Tarefa criada com sucesso');
+}
+// Exclusão simples (confirm padrão do navegador) — proporcional ao peso da ação: é só uma tarefa
+// avulsa que o próprio conferente criou, diferente da exclusão de um lançamento de apuração (que
+// exige digitar uma palavra de confirmação, por ser bem mais sensível).
+function fopExcluirTarefaAvulsa(id){
+  const t=fopTarefas.find(x=>x.id===id);
+  if(!t||t.tipo!=='manual') return;
+  if(!confirm('Excluir a tarefa "'+(t.motivo||'')+'"? Isso não pode ser desfeito.')) return;
+  fopTarefas=fopTarefas.filter(x=>x.id!==id);
+  fopSalvar();
+  fopRenderTarefas();
+  mostrarToast('🗑️ Tarefa excluída');
 }
 
 function fiscalTarefasFiltrar(filtro, el){
@@ -14707,17 +15053,25 @@ function fopRenderTarefas(){
   if(!el) return;
   if(!lista.length){ el.innerHTML=`<div style="text-align:center;padding:40px;color:var(--text-muted);">Nenhuma tarefa encontrada</div>`; return; }
   const SC={a_fazer:{c:'var(--orange)',bg:'rgba(255,140,66,.12)'},em_andamento:{c:'var(--cyan)',bg:'var(--cyan-glow)'},correcao:{c:'var(--red)',bg:'rgba(255,77,106,.1)'},concluido:{c:'var(--green)',bg:'rgba(0,200,150,.12)'},disponivel:{c:'#60a5fa',bg:'rgba(96,165,250,.12)'}};
+  const hojeISO=new Date().toISOString().slice(0,10);
   el.innerHTML=lista.map(t=>{
     const sc=SC[t.status]||{c:'var(--text-muted)',bg:'var(--bg-card)'};
+    // Diogo, 02/10/2026: tarefa avulsa (tipo 'manual', ver fopAbrirNovaTarefa) pode não ter imposto
+    // nenhum vinculado ("me enviar a nota fiscal" não é sobre PGDAS nem ICMS) e agora pode ter um
+    // prazo. Correção (tipo 'correcao', criada por fopConfirmarCorrecao) sempre tem imposto e nunca
+    // tem prazo — mantém a moldura vermelha "O que corrigir"; avulsa ganha uma moldura neutra.
+    const ehCorrecao=t.tipo==='correcao';
+    const atrasada=t.prazo&&t.prazo<hojeISO&&t.status!=='concluido';
     return `<div class="ftarefa">
       <div style="width:4px;height:48px;border-radius:2px;background:${sc.c};flex-shrink:0;"></div>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
           <span style="font-size:13px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.empresa}</span>
           <span style="font-size:10.5px;padding:2px 7px;border-radius:5px;background:${sc.bg};color:${sc.c};flex-shrink:0;">${SL[t.status]||t.status}</span>
+          ${t.prazo?`<span style="font-size:10.5px;padding:2px 7px;border-radius:5px;flex-shrink:0;${atrasada?'background:rgba(255,77,106,.15);color:var(--red);font-weight:700;':'background:var(--bg-card-hover);color:var(--text-muted);'}">${atrasada?'⚠️ Atrasada — ':'📅 '}${new Date(t.prazo+'T00:00:00').toLocaleDateString('pt-BR')}</span>`:''}
         </div>
-        <div style="font-size:11.5px;color:var(--text-muted);">${FOP_LABELS[t.imposto]||t.imposto} · Resp: ${t.responsavel}</div>
-        <div style="font-size:11.5px;color:var(--text-primary);background:rgba(255,77,106,.08);border-left:2px solid var(--red);padding:6px 8px;border-radius:4px;margin-top:5px;"><b style="color:var(--red);">📋 O que corrigir:</b> ${t.motivo}</div>
+        <div style="font-size:11.5px;color:var(--text-muted);">${t.imposto?(FOP_LABELS[t.imposto]||t.imposto)+' · ':''}Resp: ${t.responsavel}</div>
+        <div style="font-size:11.5px;color:var(--text-primary);background:${ehCorrecao?'rgba(255,77,106,.08)':'var(--bg-card-hover)'};border-left:2px solid ${ehCorrecao?'var(--red)':'var(--border-acc)'};padding:6px 8px;border-radius:4px;margin-top:5px;"><b style="color:${ehCorrecao?'var(--red)':'var(--cyan)'};">${ehCorrecao?'📋 O que corrigir:':'📝 Tarefa:'}</b> ${t.motivo||t.descricao||''}</div>
         ${t.anexoConferente?`<div style="margin-top:6px;">
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">🖼️ Print enviado pelo conferente:</div>
           <img src="${t.anexoConferente}" onclick="window.open(this.src)" style="max-width:160px;max-height:110px;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;display:block;">
@@ -14729,10 +15083,14 @@ function fopRenderTarefas(){
       </div>
       <div style="flex-shrink:0;text-align:right;min-width:120px;">
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">${new Date(t.criadoEm).toLocaleDateString('pt-BR')}</div>
-        ${t.status!=='concluido'?`<button onclick="fopAtualizarTarefa(${t.id},'concluido')" style="width:100%;padding:7px 8px;border-radius:7px;background:rgba(0,200,150,.15);border:1px solid rgba(0,200,150,.3);color:var(--green);font-weight:700;cursor:pointer;font-size:11.5px;margin-bottom:6px;">✅ Corrigido</button>`:''}
-        <select onchange="fopAtualizarTarefa(${t.id},this.value)" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:11px;color:var(--text-primary);cursor:pointer;width:100%;">
+        ${t.status!=='concluido'?`<button onclick="fopAtualizarTarefa(${t.id},'concluido')" style="width:100%;padding:7px 8px;border-radius:7px;background:rgba(0,200,150,.15);border:1px solid rgba(0,200,150,.3);color:var(--green);font-weight:700;cursor:pointer;font-size:11.5px;margin-bottom:6px;">${ehCorrecao?'✅ Corrigido':'✅ Concluído'}</button>`:''}
+        <select onchange="fopAtualizarTarefa(${t.id},this.value)" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:11px;color:var(--text-primary);cursor:pointer;width:100%;margin-bottom:6px;">
           ${Object.entries(SL).map(([k,v])=>`<option value="${k}" ${t.status===k?'selected':''}>${v}</option>`).join('')}
         </select>
+        ${t.tipo==='manual'?`<div style="display:flex;gap:6px;">
+          <button onclick="fopAbrirEditarTarefa(${t.id})" title="Editar esta tarefa" style="flex:1;padding:5px 4px;border-radius:6px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-soft);cursor:pointer;font-size:11px;">✏️ Editar</button>
+          <button onclick="fopExcluirTarefaAvulsa(${t.id})" title="Excluir esta tarefa" style="flex:1;padding:5px 4px;border-radius:6px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--red);cursor:pointer;font-size:11px;">🗑️ Excluir</button>
+        </div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -14776,6 +15134,19 @@ function fiscalConfFiltrar(filtro, el){
   document.querySelectorAll('#fsub-conferencia .ftab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
   fopRenderConferencia();
+}
+
+// Diogo, 02/10/2026: "criar uma escrita correções, e todas as empresas que tiverem correções
+// aparecer lá dentro dessa abinha" — atalho do menu de cima pra tela de Conferência (que já sabia
+// filtrar só "Em Correção"), já chegando com esse filtro aplicado — sem precisar o conferente abrir
+// a Conferência e clicar no filtro manualmente. Os outros filtros (Aguardando Conferência, Correções
+// Retornadas) continuam disponíveis dentro da tela, caso ele queira ver o contexto mais amplo.
+function fopAbrirCorrecoesTab(el){
+  fopFiltroConf='correcao';
+  fiscalTab('conferencia', el);
+  document.querySelectorAll('#fsub-conferencia .filtros-bar .ftab').forEach(t=>t.classList.remove('active'));
+  const alvo=document.querySelector('#fsub-conferencia .filtros-bar .ftab[onclick*="\'correcao\'"]');
+  if(alvo) alvo.classList.add('active');
 }
 
 function fopRenderConferencia(){
@@ -15143,7 +15514,7 @@ function fopRenderGerencial(){
       });
     });
 
-    const ordem = ['pgdas','das_mei','icms','fundos','ipi','pis_cofins','iss','retidos','irpj_csll','conferencia'];
+    const ordem = [...FOP_ORDEM_IMPOSTOS_CARD,'conferencia'];
     const linhas = ordem.filter(imp=>resumoOb[imp]&&resumoOb[imp].total>0);
 
     if(!linhas.length){
@@ -16261,6 +16632,7 @@ async function chkCarregar(){
     chkLista=CHK_DEFAULTS.map((c,i)=>({id:'default_'+i,nome:c.nome,itens:c.itens,criado_por:'sistema'}));
   }
   chkRender();
+  fopChecklistsMudaram();
 }
 
 async function chkSeedPadroes(){
@@ -16365,16 +16737,30 @@ async function chkSalvar(){
   } catch(e){mostrarToast('❌ Erro: '+e.message);return;}
   document.getElementById('modal-chk-editor').classList.remove('open');
   chkRender();
+  fopChecklistsMudaram();
 }
 
 async function chkExcluir(id,nome){
-  if(!confirm('Excluir "'+nome+'"? Isso não pode ser desfeito.')) return;
+  // Se for um checklist personalizado já vinculado a empresas (ver FOP_CHK_PERS), avisa antes de excluir
+  const _chave=fopChkChave(id);
+  const _vinculadas=FOP_CHK_PERS[_chave]?Object.values(fopFiscalConfigs||{}).filter(c=>c&&Array.isArray(c.impostos)&&c.impostos.includes(_chave)).length:0;
+  const _aviso=_vinculadas?'\n\nATENÇÃO: ele está vinculado a '+_vinculadas+' empresa(s) na Configuração Fiscal — elas deixam de ter essa obrigação na Apuração.':'';
+  if(!confirm('Excluir "'+nome+'"? Isso não pode ser desfeito.'+_aviso)) return;
   try {
     const {error}=await sb.from('checklists').delete().eq('id',id);
     if(error) throw error;
     chkLista=chkLista.filter(x=>x.id!==id);
     mostrarToast('🗑️ Checklist excluído'); chkRender();
+    fopChecklistsMudaram();
   } catch(e){mostrarToast('❌ Erro: '+e.message);}
+}
+// Sempre que a biblioteca de checklists muda (carregou, criou, editou, excluiu): atualiza as
+// obrigações personalizadas (FOP_CHK_PERS) e, se a tela Fiscal estiver aberta, redesenha ela.
+function fopChecklistsMudaram(){
+  fopRegistrarChecklistsPersonalizados();
+  try{
+    if(document.getElementById('page-fiscal')?.classList.contains('active') && typeof renderFiscalTable==='function') renderFiscalTable();
+  }catch(e){}
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
@@ -16382,6 +16768,10 @@ fopCarregar();
 // Lembra se o usuário tinha deixado o resumo do Fiscal minimizado (ver fopToggleDashboardResumo)
 try{ fopDashResumoMinimizado = localStorage.getItem('fopDashResumoMinimizado')==='1'; }catch(e){}
 fopAplicarPreferenciaDashboard();
+// Atualiza a Configuração Fiscal/Contábil em segundo plano a cada 25s, pra quem já está com o
+// Portal aberto enxergar a configuração que o colega acabou de salvar sem precisar recarregar a
+// página (ver fopSincronizarConfigsRemoto).
+try{ setInterval(fopSincronizarConfigsRemoto, 25000); }catch(e){}
 </script>
 
 
