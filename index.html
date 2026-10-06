@@ -4599,6 +4599,10 @@ function iniciarPollingSync(){
   _pollingInterval = setInterval(async () => {
     if(!usuarioLogado) return;
     try {
+      // Tem coisa sendo salva (ou que não conseguiu salvar)? Não recarrega agora: o que veio do banco
+      // poderia ser o valor de ANTES da gravação chegar e apagar da tela o que a pessoa acabou de fazer.
+      await fopReenviarFalhas();
+      if(fopSyncDeveEsperar()) return;
       // Recarregar TUDO do Supabase
       await Promise.all([
         carregarClientes(),
@@ -4620,6 +4624,8 @@ function iniciarPollingSync(){
 document.addEventListener('visibilitychange', async () => {
   if(document.visibilityState === 'visible' && usuarioLogado){
     try {
+      await fopReenviarFalhas();
+      if(fopSyncDeveEsperar()) return;
       await Promise.all([
         carregarClientes(), carregarProcessosSupa(), carregarLeadsSupa(),
         carregarOnboardingSupa(), carregarComissoesSupa(), carregarRevisoesSupa(), carregarMetasSupa(),
@@ -4908,7 +4914,7 @@ function socForaDoPrazo(proc){
 
 async function salvarProcessoSupabase(proc){
   try {
-    const { error } = await sb.from('processos').upsert({
+    const { error } = await fopGravarLinha('processos', {
       id: proc.id,
       nome: proc.nome,
       tipo: proc.tipo,
@@ -4927,7 +4933,7 @@ async function salvarProcessoSupabase(proc){
       lead_origem_id: proc.leadOrigemId||null,
       anotacoes: proc.anotacoes||null,
       atualizado_em: new Date().toISOString(),
-    }, { onConflict: 'id' });
+    });
     if(error) throw error;
   } catch(e){
     console.warn('Erro save processo:', e.message);
@@ -4964,7 +4970,7 @@ async function carregarLeadsSupa(){
 
 async function salvarLeadSupabase(lead){
   try {
-    const { error } = await sb.from('leads').upsert({
+    const { error } = await fopGravarLinha('leads', {
       id: lead.id,
       nome: lead.nome,
       cnpj: lead.cnpj||null,
@@ -4979,7 +4985,7 @@ async function salvarLeadSupabase(lead){
       mes_abertura: lead.mes_abertura,
       mes_conclusao: lead.mes_conclusao||null,
       atualizado_em: new Date().toISOString(),
-    }, { onConflict: 'id' });
+    });
     if(error) throw error;
   } catch(e){
     console.warn('Erro save lead:', e.message);
@@ -4992,7 +4998,7 @@ async function carregarOnboardingSupa(){
   try {
     const { data, error } = await sb.from('onboarding').select('*').order('criado_em', {ascending:false});
     if(error) throw error;
-    if(data && data.length > 0){
+    if(data){
       clientesOnb = data.map(c=>({
         id: c.id,
         nome: c.nome,
@@ -5016,7 +5022,7 @@ async function carregarOnboardingSupa(){
 
 async function salvarOnboardingSupabase(c){
   try {
-    const { error } = await sb.from('onboarding').upsert({
+    const { error } = await fopGravarLinha('onboarding', {
       id: c.id,
       nome: c.nome,
       cnpj: c.cnpj||null,
@@ -5029,7 +5035,7 @@ async function salvarOnboardingSupabase(c){
       gatilho: c.gatilho||null,
       comentarios: c.comentarios||[],
       atualizado_em: new Date().toISOString(),
-    }, { onConflict: 'id' });
+    });
     if(error){
       console.warn('Erro save onboarding:', error.message);
       mostrarToast('⚠️ Erro ao salvar onboarding: ' + error.message);
@@ -5061,7 +5067,7 @@ async function carregarComissoesSupa(){
 
 async function salvarComissaoSupabase(c){
   try {
-    const { error } = await sb.from('comissoes').upsert({
+    const { error } = await fopGravarLinha('comissoes', {
       id: c.id,
       nome: c.nome,
       parceiro: c.parceiro||null,
@@ -5069,9 +5075,9 @@ async function salvarComissaoSupabase(c){
       obs: c.obs||null,
       comissao_paga: c.comissaoPaga||false,
       resp: c.resp||null,
-    }, { onConflict: 'id' });
+    });
     if(error) throw error;
-  } catch(e){ console.warn('Erro save comissão:', e.message); }
+  } catch(e){ console.warn('Erro save comissão:', e.message); mostrarToast('❌ Erro ao salvar comissão: ' + e.message); }
 }
 
 // ── REVISÕES ───────────────────────────────────────
@@ -5096,16 +5102,16 @@ async function carregarRevisoesSupa(){
 
 async function salvarRevisaoSupabase(r){
   try {
-    const { error } = await sb.from('revisoes').upsert({
+    const { error } = await fopGravarLinha('revisoes', {
       id: r.id,
       cliente: r.cliente,
       motivo: r.motivo||null,
       prioridade: r.prioridade||'alta',
       resolvido: r.resolvido||false,
       atualizado_em: new Date().toISOString(),
-    }, { onConflict: 'id' });
+    });
     if(error) throw error;
-  } catch(e){ console.warn('Erro save revisão:', e.message); }
+  } catch(e){ console.warn('Erro save revisão:', e.message); mostrarToast('❌ Erro ao salvar revisão: ' + e.message); }
 }
 
 // ── MENSAGENS ──────────────────────────────────────
@@ -5833,7 +5839,7 @@ function _excluirLeadDeVerdade(id){
   leads = leads.filter(l=>l.id!==id);
   document.getElementById('modal-editar-lead')?.classList.remove('open');
   renderKanban();
-  sb.from('leads').delete().eq('id', id).then(({error})=>{
+  fopRastrearEscrita(sb.from('leads').delete().eq('id', id)).then(({error})=>{
     if(error) mostrarToast('⚠️ Erro ao excluir: ' + error.message);
     else mostrarToast('🗑 Lead excluído');
   });
@@ -5876,13 +5882,11 @@ function salvarMeta(){
   atualizarPainelMeta();
   mostrarToast('🎯 Meta de ' + MESES_NOMES[mes] + ' definida: R$ ' + valor.toLocaleString('pt-BR'));
 
-  // Salvar no Supabase (tabela configuracoes)
+  // Salvar no Supabase (tabela configuracoes) — com conferência do resultado e nova tentativa se falhar
   (async()=>{
     const chave = 'meta_mes_'+mes;
-    // Delete primeiro para evitar duplicate key, depois insert
-    await sb.from('configuracoes').delete().eq('chave', chave);
-    const {error} = await sb.from('configuracoes').insert({chave, valor: String(valor)});
-    if(error) mostrarToast('⚠️ Erro ao salvar meta: ' + error.message);
+    const gravou = await fopSerial('cfg:'+chave, ()=>fopGravarConfig(chave, String(valor), null));
+    if(!gravou) mostrarToast('⚠️ Erro ao salvar meta — o Portal vai tentar de novo');
   })();
 }
 
@@ -8210,7 +8214,7 @@ async function excluirOnboarding(id, nome){
   if(!confirm(`Excluir "${nome}" do onboarding?\n\nEsta ação não pode ser desfeita.`)) return;
   clientesOnb = clientesOnb.filter(c=>c.id!==id);
   renderOnbGrid();
-  const {error} = await sb.from('onboarding').delete().eq('id', id);
+  const {error} = await fopRastrearEscrita(sb.from('onboarding').delete().eq('id', id));
   if(error) mostrarToast('⚠️ Erro ao excluir: '+error.message);
   else mostrarToast('🗑 Removido do onboarding');
 }
@@ -9005,7 +9009,7 @@ function salvarEdicaoProcesso(){
       const onbVinculado = (typeof clientesOnb!=='undefined') ? clientesOnb.find(c=>c.procId===proc.id) : null;
       if(onbVinculado && confirm('Este processo tinha um card em Onboarding (criado quando era "'+(TIPO_LABEL_EDIT[tipoAntes]||tipoAntes)+'"). Transferência/Alteração/Baixa não geram onboarding. Deseja remover esse card do Onboarding também?')){
         clientesOnb = clientesOnb.filter(c=>c.id!==onbVinculado.id);
-        sb.from('onboarding').delete().eq('id', onbVinculado.id).then(({error})=>{
+        fopRastrearEscrita(sb.from('onboarding').delete().eq('id', onbVinculado.id)).then(({error})=>{
           if(error) console.warn('Erro ao remover onboarding vinculado:', error.message);
         });
         if(typeof renderOnbGrid==='function') renderOnbGrid();
@@ -9076,7 +9080,7 @@ function excluirProcesso(id){
   processosSoc = processosSoc.filter(p=>p.id!==id);
   renderSocGrid();
   // Remover do Supabase
-  sb.from('processos').delete().eq('id', id).then(({error})=>{
+  fopRastrearEscrita(sb.from('processos').delete().eq('id', id)).then(({error})=>{
     if(error) console.warn('Erro ao excluir processo:', error.message);
   });
   mostrarToast('🗑 Processo de '+proc.nome+' excluído');
@@ -9929,7 +9933,7 @@ function excluirComissao(){
     if(proc){ proc.temComissao=false; proc.parceiro=''; salvarProcessoSupabase(proc); }
   } else {
     comissoesExtras = comissoesExtras.filter(c=>c.id!==id);
-    sb.from('comissoes').delete().eq('id', id).then(({error})=>{
+    fopRastrearEscrita(sb.from('comissoes').delete().eq('id', id)).then(({error})=>{
       if(error) mostrarToast('⚠️ Erro ao excluir: ' + error.message);
     });
   }
@@ -10001,7 +10005,7 @@ function excluirRevisao(){
   revisoesContratos = revisoesContratos.filter(x=>x.id!==id);
   document.getElementById('modal-editar-revisao').classList.remove('open');
   renderRevisao();
-  sb.from('revisoes').delete().eq('id', id).then(({error})=>{
+  fopRastrearEscrita(sb.from('revisoes').delete().eq('id', id)).then(({error})=>{
     if(error) mostrarToast('⚠️ Erro ao excluir: ' + error.message);
     else mostrarToast('🗑 Revisão removida');
   });
@@ -10571,6 +10575,8 @@ let fopApur = {};
 let fopApurExcluidos = {};
 let fopTarefas = [];
 let fopHistorico = [];
+// Tarefas excluídas de propósito (id -> data) — "lápide": sem isso, a mesclagem traria a tarefa de volta do banco
+let fopTarefasExcluidas = {};
 let fopFiltroRegime2 = 'todos';
 let fopFiltroStatus2 = 'todos';
 // Diogo, 16/09/2026: precisa controlar quantas empresas AINDA FALTAM entregar cada imposto
@@ -10678,11 +10684,122 @@ const FOP_VENCIMENTOS = {icms:10,fundos:10,ipi:15,pis_cofins:25,iss:10,retidos:1
   efd_contrib:10,efd_reinf:15,mit:20,sped_fiscal:20,sintegra:15,destda:20};
 
 // ── PERSISTÊNCIA ────────────────────────────────────────────────────────────
-async function fopSalvarChave(chave, valor){
-  try {
-    await sb.from('configuracoes').delete().eq('chave', chave);
-    await sb.from('configuracoes').insert({chave, valor: JSON.stringify(valor)});
-  } catch(e){ console.warn('fopSalvar Supabase:', chave, e.message); }
+// ── GRAVAÇÃO SEGURA (tudo que a equipe faz tem que ficar salvo no banco) ─────────────────────────
+// Diogo, 06/10/2026: "tudo que a gente fizer, ele fique salvo [...] no banco e pra todo mundo visualizar".
+// Antes, se uma gravação falhasse (internet caiu um instante, banco ocupado), o Portal NÃO percebia: a
+// tela mostrava como feito, mas o banco ficava com o valor antigo — e, mais tarde, a próxima sincronização
+// trazia o valor antigo de volta ("voltou pro que era"). Agora toda gravação:
+//   1) confere se o banco realmente aceitou (olha o "erro" que o banco devolve);
+//   2) se não aceitou, tenta de novo (até 3 vezes, esperando um pouquinho entre elas);
+//   3) se ainda assim não deu, avisa na tela ("⚠️ Não salvou — tentando de novo") e fica tentando a cada
+//      ciclo da sincronização, SEM deixar a sincronização apagar o que a pessoa fez enquanto isso;
+//   4) um selinho no canto da tela mostra "Salvando…" / "✓ Tudo salvo" / "⚠️ Não salvou";
+//   5) se a pessoa tentar fechar a aba com algo ainda sem salvar, o navegador avisa.
+const FOP_GRAVAR = { emAndamento:0, ultimaEm:0, falhas:{}, reenviando:false, tmrOk:null };
+function fopEscritasPendentes(){ return FOP_GRAVAR.emAndamento>0 || Object.keys(FOP_GRAVAR.falhas).length>0; }
+// A sincronização automática (que recarrega a tela com o que está no banco) NÃO deve rodar enquanto há
+// gravação em andamento/falhada, nem logo depois de uma: senão ela poderia trazer de volta o valor de
+// ANTES da gravação chegar no banco.
+// (Falha de linha que dura mais de 2 minutos deixa de segurar a sincronização, pra um problema permanente
+// num cadastro não congelar a tela do usuário pra sempre — o selo vermelho continua avisando.)
+function fopSyncDeveEsperar(){
+  if(FOP_GRAVAR.emAndamento>0 || (Date.now()-FOP_GRAVAR.ultimaEm)<2500) return true;
+  return Object.keys(FOP_GRAVAR.falhas).some(k=>k.indexOf('lin:')===0 && (Date.now()-(FOP_GRAVAR.falhas[k].desde||0))<120000);
+}
+function fopAtualizarStatusSalvar(){
+  if(typeof document==='undefined'||!document.body) return;
+  let el=document.getElementById('fop-status-salvar');
+  if(!el){
+    el=document.createElement('div'); el.id='fop-status-salvar';
+    el.setAttribute('role','status'); el.setAttribute('aria-live','polite');
+    el.style.cssText='position:fixed;left:14px;bottom:14px;z-index:99999;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:600;font-family:inherit;box-shadow:0 2px 10px rgba(0,0,0,.35);display:none;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  const nFalhas=Object.keys(FOP_GRAVAR.falhas).length;
+  clearTimeout(FOP_GRAVAR.tmrOk);
+  if(nFalhas){
+    el.dataset.estado='erro'; el.textContent='⚠️ Não salvou — tentando de novo'; el.style.background='#7f1d1d'; el.style.color='#fff'; el.style.display='block';
+  } else if(FOP_GRAVAR.emAndamento>0){
+    el.dataset.estado='salvando'; el.textContent='⏳ Salvando…'; el.style.background='#334155'; el.style.color='#fff'; el.style.display='block';
+  } else if(el.dataset.estado==='salvando'||el.dataset.estado==='erro'){
+    el.dataset.estado='salvo'; el.textContent='✓ Tudo salvo'; el.style.background='#14532d'; el.style.color='#fff'; el.style.display='block';
+    FOP_GRAVAR.tmrOk=setTimeout(()=>{ if(!fopEscritasPendentes()){ el.style.display='none'; el.dataset.estado=''; } }, 2500);
+  }
+}
+function fopComecouGravar(){ FOP_GRAVAR.emAndamento++; fopAtualizarStatusSalvar(); }
+function fopTerminouGravar(){ FOP_GRAVAR.emAndamento=Math.max(0,FOP_GRAVAR.emAndamento-1); FOP_GRAVAR.ultimaEm=Date.now(); fopAtualizarStatusSalvar(); }
+// Acompanha uma gravação que já foi disparada por aí (ex.: apagar um lead) — só conta como "em andamento".
+function fopRastrearEscrita(p){
+  fopComecouGravar();
+  return Promise.resolve(p).then(r=>{ fopTerminouGravar(); return r; }, e=>{ fopTerminouGravar(); throw e; });
+}
+// Roda `fazer` (que devolve a resposta do banco: {error}) até dar certo, no máximo `tentativas` vezes.
+async function fopTentar(fazer, tentativas){
+  const n=tentativas||3; let ultimoErro=null;
+  for(let i=0;i<n;i++){
+    try{ const r=await fazer(); if(!(r&&r.error)) return {ok:true,res:r}; ultimoErro=r.error; }
+    catch(e){ ultimoErro=e; }
+    if(i<n-1) await new Promise(res=>setTimeout(res, 700*Math.pow(3,i)));
+  }
+  return {ok:false,error:ultimoErro};
+}
+function fopMarcarFalha(chave, retry, erro){
+  const antiga=FOP_GRAVAR.falhas[chave];
+  FOP_GRAVAR.falhas[chave]={retry, desde:(antiga&&antiga.desde)||Date.now()}; console.warn('Não salvou (vai tentar de novo):', chave, erro&&erro.message);
+}
+function fopLimparFalha(chave){ if(chave in FOP_GRAVAR.falhas){ delete FOP_GRAVAR.falhas[chave]; fopAtualizarStatusSalvar(); } }
+// Tenta de novo tudo o que ficou sem salvar. Chamada a cada ciclo das sincronizações automáticas.
+async function fopReenviarFalhas(){
+  if(FOP_GRAVAR.reenviando) return; FOP_GRAVAR.reenviando=true;
+  try{
+    for(const k of Object.keys(FOP_GRAVAR.falhas)){
+      const f=FOP_GRAVAR.falhas[k]; if(!f) continue;
+      try{ await f.retry(); }catch(e){}
+    }
+  } finally { FOP_GRAVAR.reenviando=false; }
+}
+// Grava UMA linha de uma tabela (leads, processos, onboarding, comissões, revisões, clientes...).
+async function fopGravarLinha(tabela, obj, tentativas){
+  const k='lin:'+tabela+':'+obj.id;
+  fopComecouGravar();
+  try{
+    const r=await fopTentar(()=>sb.from(tabela).upsert(obj,{onConflict:'id'}), tentativas);
+    if(r.ok){ fopLimparFalha(k); return {error:null}; }
+    fopMarcarFalha(k, ()=>fopGravarLinha(tabela,obj,1), r.error);
+    return {error:r.error||new Error('Falha ao gravar')};
+  } finally { fopTerminouGravar(); }
+}
+// Grava uma chave da tabela "configuracoes" (apaga a antiga e insere a nova), conferindo o resultado.
+async function fopGravarConfig(chave, texto, retry){
+  const k='cfg:'+chave;
+  fopComecouGravar();
+  try{
+    const r=await fopTentar(async()=>{
+      const d=await sb.from('configuracoes').delete().eq('chave', chave);
+      if(d&&d.error) return d;
+      return await sb.from('configuracoes').insert({chave, valor: texto});
+    });
+    if(r.ok){ fopLimparFalha(k); return true; }
+    fopMarcarFalha(k, retry||(()=>fopGravarConfig(chave,texto,retry)), r.error);
+    return false;
+  } finally { fopTerminouGravar(); }
+}
+// Uma gravação por vez por chave (apagar+inserir não é atômico: duas ao mesmo tempo podiam duplicar/perder).
+const FOP_SERIAL={};
+function fopSerial(k, fn){
+  const prev=FOP_SERIAL[k];
+  const p=prev ? prev.catch(()=>{}).then(fn) : Promise.resolve(fn()); // sem fila: começa já, na mesma hora
+  FOP_SERIAL[k]=p;
+  const limpar=()=>{ if(FOP_SERIAL[k]===p) delete FOP_SERIAL[k]; };
+  p.then(limpar, limpar);
+  return p;
+}
+if(typeof window!=='undefined'){
+  window.addEventListener('beforeunload', e=>{ if(fopEscritasPendentes()){ e.preventDefault(); e.returnValue='Ainda há alterações sendo salvas. Se você sair agora, elas podem se perder.'; return e.returnValue; } });
+}
+function fopSalvarChave(chave, valor){
+  const texto=JSON.stringify(valor);
+  return fopSerial('cfg:'+chave, ()=>fopGravarConfig(chave, texto, ()=>fopSalvarChave(chave, valor)));
 }
 // Blobs organizados por "empresa_ano_mês" (fiscal_apur, fiscal_apur_acess, fiscal_prazos_internos,
 // contabil_apur, contabil_apur_acess) são editados aos poucos, o dia todo, por várias pessoas ao
@@ -10696,7 +10813,8 @@ async function fopSalvarChave(chave, valor){
 // `idsExcluidos` (opcional) — chaves de 1º nível que foram excluídas DE PROPÓSITO localmente e por
 // isso NÃO devem ser trazidas de volta do remoto (ver fopItensExtraLibExcluidos acima). Sem isso, a
 // mesclagem não tem como diferenciar "esta aba nunca viu esse item" de "esta aba apagou esse item".
-async function fopSalvarChaveMesclada(chave, valorLocal, idsExcluidos){
+function fopSalvarChaveMesclada(chave, valorLocal, idsExcluidos){
+  return fopSerial('cfg:'+chave, async()=>{
   try {
     const { data } = await sb.from('configuracoes').select('valor').eq('chave', chave).maybeSingle();
     if(data && data.valor){
@@ -10719,21 +10837,195 @@ async function fopSalvarChaveMesclada(chave, valorLocal, idsExcluidos){
       }
     }
   } catch(e){ /* não conseguiu buscar o remoto — segue e salva só o que tem local, como antes */ }
-  return fopSalvarChave(chave, valorLocal);
+  return fopGravarConfig(chave, JSON.stringify(valorLocal), ()=>fopSalvarChaveMesclada(chave, valorLocal, idsExcluidos));
+  });
 }
-// ── CONFIGURAÇÕES POR EMPRESA (fiscal_configs / contabil_configs) ─────────────
-// Diogo, 05/10/2026: "essas empresas já foram configuradas, porém elas voltam para a configuração e
-// não ficam lá em apuração." Causa raiz: fopSalvarChaveMesclada foi feita pra blobs "mês -> imposto"
-// (dois níveis) e trazia de volta, campo por campo, qualquer campo que o banco tivesse e a cópia local
-// não. Uma configuração de empresa é um registro "chato" (um nível só): quando a empresa tinha sido
-// resetada antes ({resetado:true, pendente:true} no banco) e depois era configurada de verdade, a
-// marca antiga de reset era misturada de volta na configuração nova — e ela voltava pra fila de
-// Configuração Fiscal. Aqui a regra é por empresa inteira: vale a versão MAIS RECENTE (configEm ou
-// resetadoEm); nunca se misturam campos de uma versão com a outra.
-function fopCfgTs(cfg){ return (cfg && (cfg.configEm || cfg.resetadoEm)) || ''; }
-// Cura registros já corrompidos pelo bug acima: uma configuração completa (tem configEm) NUNCA
-// deveria carregar a marca de reset/pendente — só o registro de reset puro ({resetado,pendente}, sem
-// configEm) é um reset de verdade. Retorna true se mudou alguma coisa.
+// ── SINCRONIZAÇÃO SEGURA, REGISTRO A REGISTRO (apurações, acessórias e configurações) ─────────────
+// Diogo, 06/10/2026: "empresa vem pra conferência, a gente aprova, finaliza, e depois de um tempo ela
+// VOLTA pra conferência [...] e tem empresa que a gente seleciona um checklist na configuração, fica
+// tudo lá, e depois de um tempo esse checklist SOME. Deve ter algum bug: tudo que a gente faz, depois
+// de um tempo volta do jeito que era antes."
+// Causa raiz: cada aba do Portal só carregava os dados UMA VEZ (no login) e, a cada ação, regravava
+// o banco com a cópia que tinha na memória. A mesclagem antiga só trazia do banco o que a aba NÃO
+// tinha — e, quando os dois tinham o mesmo registro (ex.: ICMS da empresa X), a cópia da aba vencia
+// SEMPRE. Resultado: uma aba aberta desde cedo (com X ainda "em conferência") salvava qualquer coisa
+// e desfazia a aprovação que outra pessoa tinha feito horas depois; o mesmo valia pra configurações.
+// Agora, pra cada registro (empresa+mês+obrigação, ou empresa):
+//   • se ESTA aba não mexeu nele desde a última vez que sincronizou, vale o do banco (é mais novo);
+//   • se esta aba mexeu, vale o mais recente (cada registro mexido ganha um carimbo "_ts");
+//   • salvar nunca mais apaga o que outra pessoa fez, e a aba também puxa as novidades sozinha a cada
+//     25 segundos e quando você volta pra ela (ver fopSincronizarConfigsRemoto).
+const FOP_SYNC_DEFS = {
+  fiscal_apur:         { nivel:2, get:()=>fopApur,         set:v=>{ fopApur=v; },         lap:()=>fopApurExcluidos, lapChave:'fiscal_apur_excluidos', ls:'fopApur' },
+  fiscal_apur_acess:   { nivel:2, get:()=>fopApurAcess,    set:v=>{ fopApurAcess=v; },    lap:()=>fopApurExcluidos, lapChave:'fiscal_apur_excluidos', ls:'fopApurAcess' },
+  contabil_apur:       { nivel:2, get:()=>contApur,        set:v=>{ contApur=v; },        lap:()=>null,             ls:'contApur' },
+  contabil_apur_acess: { nivel:2, get:()=>contApurAcess,   set:v=>{ contApurAcess=v; },   lap:()=>null,             ls:'contApurAcess' },
+  fiscal_configs:      { nivel:1, get:()=>fopFiscalConfigs,set:v=>{ fopFiscalConfigs=v; },lap:()=>null,            ls:'fopFiscalConfigs', cura:true },
+  contabil_configs:    { nivel:1, get:()=>contConfigs,     set:v=>{ contConfigs=v; },     lap:()=>null,             ls:'contConfigs', cura:true },
+  // Listas com "id" em cada item: tarefas (com lápide de excluídas) e histórico (só cresce; nunca perde item)
+  fiscal_tarefas:      { nivel:'lista', get:()=>fopTarefas,   set:v=>{ fopTarefas=v; },   lap:()=>fopTarefasExcluidas, lapChave:'fiscal_tarefas_excluidas', ls:'fopTarefas' },
+  fiscal_historico:    { nivel:'lista', append:true, get:()=>fopHistorico, set:v=>{ fopHistorico=v; }, lap:()=>null, ls:'fopHistorico',
+                         ordenar:(a)=>{ a.sort((x,y)=>String(y.ts||'').localeCompare(String(x.ts||''))); if(a.length>1000) a.length=1000; } },
+  // ── "Sistema total" (Diogo, 06/10/2026): o resto do que o Fiscal/Contábil guarda também passa pelo
+  // mesmo motor. `delGen` = apagar também é respeitado sem precisar de lápide: se esta aba apagou um
+  // registro que o banco ainda tem igualzinho ao que ela viu, fica apagado (e some pro resto da equipe);
+  // se outra pessoa apagou e esta aba não mexeu nele, ele some daqui também. `prim` = o valor é um texto
+  // simples (data, observação) em vez de um objeto — não dá pra carimbar, então o que esta aba mexeu vale.
+  fiscal_partic:             { nivel:1, prim:true, delGen:true, get:()=>fopParticOverride,       set:v=>{ fopParticOverride=v; },       lap:()=>null, ls:'fopPartic' },
+  fiscal_prazos_internos:    { nivel:2, prim:true, delGen:true, get:()=>fopPrazosInternos,       set:v=>{ fopPrazosInternos=v; },       lap:()=>null, ls:'fopPrazosInternos' },
+  fiscal_vencimentos_manuais:{ nivel:2, prim:true, delGen:true, get:()=>fopVencimentosManuais,   set:v=>{ fopVencimentosManuais=v; },   lap:()=>null, ls:'fopVencimentosManuais' },
+  fiscal_itens_extra_lib:    { nivel:1, delGen:true, get:()=>fopItensExtraLib, set:v=>{ fopItensExtraLib=v; }, lap:()=>fopItensExtraLibExcluidos, lapChave:'fiscal_itens_extra_lib_excluidos', ls:'fopItensExtraLib' },
+  fiscal_colaboradores:      { nivel:'lista', delGen:true, get:()=>fopColaboradores, set:v=>{ fopColaboradores=v; }, lap:()=>null, ls:'fopColaboradores' },
+  contabil_colaboradores:    { nivel:'lista', delGen:true, get:()=>contColaboradores, set:v=>{ contColaboradores=v; }, lap:()=>null, ls:'contColaboradores' },
+  contabil_checklists:       { nivel:'lista', delGen:true, get:()=>contChkLista,      set:v=>{ contChkLista=v; },      lap:()=>null, ls:'contChkLista' },
+  // Cronômetros: "ativos" (um por pessoa/obrigação em andamento) + "registros" (histórico de tempo gasto, só cresce)
+  fiscal_tempos:             { nivel:'tempos', delGen:true, get:()=>fopTempos,  set:v=>{ fopTempos=v; },  lap:()=>null, ls:'fopTempos' },
+  contabil_tempos:           { nivel:'tempos', delGen:true, get:()=>contTempos, set:v=>{ contTempos=v; }, lap:()=>null, ls:'contTempos' },
+};
+// Registros de tempo não têm "id": monta um estável a partir dos campos que nunca mudam depois de criado.
+function fopTempoRegId(r){ return r.id || [r.cnpj,r.imposto||'',r.checklistId||'',r.fam||'',r.usuario||'',r.inicio||'',r.fim||''].join('~'); }
+const FOP_SYNC = { snaps:{}, ok:{}, fila:{} };
+// Uma lápide (exclusão de propósito, com a data) só vale pra registro que NÃO foi refeito depois dela:
+// se alguém apagou e depois lançou de novo (o registro novo ganha "_ts" mais recente), ele é legítimo.
+function fopLapideVale(ts, reg){
+  if(!ts) return false;
+  const t=(reg&&reg._ts)||'';
+  return !(t>ts);
+}
+function fopJsonReg(r){ return JSON.stringify(r,(k,v)=>k==='_ts'?undefined:v); }
+function fopSyncPercorrer(valor, nivel, cb){
+  if(!valor||typeof valor!=='object') return;
+  if(nivel==='lista'){ if(Array.isArray(valor)) valor.forEach(it=>{ if(it&&typeof it==='object'&&it.id!==undefined) cb(String(it.id),it); }); return; }
+  if(nivel==='tempos'){
+    if(valor.ativos&&typeof valor.ativos==='object') Object.keys(valor.ativos).forEach(k=>cb('a|'+k,valor.ativos[k]));
+    if(Array.isArray(valor.registros)) valor.registros.forEach(r=>{ if(r&&typeof r==='object') cb('r|'+fopTempoRegId(r),r); });
+    return;
+  }
+  if(nivel===2){
+    Object.keys(valor).forEach(a=>{ const o=valor[a]; if(o&&typeof o==='object'&&!Array.isArray(o)) Object.keys(o).forEach(b=>cb(a+'|'+b,o[b])); });
+  } else {
+    Object.keys(valor).forEach(a=>cb(a,valor[a]));
+  }
+}
+// "Foto" do que esta aba viu/gravou por último, registro a registro — é com ela que se sabe o que a aba
+// MEXEU desde então (diferente da foto = mexido; igual = só carregado, o banco pode ter coisa mais nova).
+function fopSyncTirarSnap(chave){
+  const def=FOP_SYNC_DEFS[chave]; const m={};
+  fopSyncPercorrer(def.get(), def.nivel, (id,r)=>{ m[id]=fopJsonReg(r); });
+  FOP_SYNC.snaps[chave]=m; FOP_SYNC.ok[chave]=true;
+}
+// Carimba (_ts = agora) todo registro que esta aba mexeu desde a última foto. Roda no começo de cada
+// fopSalvar(), antes de qualquer coisa assíncrona.
+function fopSyncCarimbar(chave){
+  if(!FOP_SYNC.ok[chave]) return; // nunca sincronizou nesta sessão — sem foto não dá pra saber o que foi mexido
+  const def=FOP_SYNC_DEFS[chave]; if(def.append) return; const snap=FOP_SYNC.snaps[chave]||{}; const agora=new Date().toISOString();
+  fopSyncPercorrer(def.get(), def.nivel, (id,r)=>{
+    if(r&&typeof r==='object'&&!Array.isArray(r)&&fopJsonReg(r)!==snap[id]) r._ts=agora;
+  });
+}
+function fopSubstituirNoLugar(destino, origem){
+  // troca o conteúdo mantendo o MESMO objeto (quem estiver segurando uma referência a ele enxerga o novo)
+  Object.keys(destino).forEach(k=>{ delete destino[k]; });
+  Object.assign(destino, JSON.parse(JSON.stringify(origem)));
+}
+// Mescla o conteúdo remoto no local. Devolve a lista de ids que passaram a valer o do banco.
+function fopSyncMesclar(chave, remoto){
+  const def=FOP_SYNC_DEFS[chave]; const local=def.get(); const adotados=[];
+  if(!remoto||typeof remoto!=='object'||!local) return adotados;
+  const snap=FOP_SYNC.snaps[chave]||{}; const ok=!!FOP_SYNC.ok[chave]; const lap=def.lap();
+  const tsDe=(r)=>(r&&(r._ts||r.configEm||r.resetadoEm))||'';
+  const remotoVence=(id,l,r)=>{
+    if(!l||typeof l!=='object'||!r||typeof r!=='object'){
+      if(!def.prim) return true;
+      if(fopJsonReg(l)===fopJsonReg(r)) return false;
+      const mexidoP = !ok || snap[id]===undefined || fopJsonReg(l)!==snap[id];
+      return !mexidoP;                 // texto simples: o que esta aba mexeu vale; senão, o do banco
+    }
+    const jr=fopJsonReg(r), jl=fopJsonReg(l);
+    if(jr===jl) return false;
+    const mexido = !ok || snap[id]===undefined || jl!==snap[id];
+    if(!mexido) return true;           // esta aba não mexeu: o do banco é mais novo
+    return tsDe(r)>tsDe(l);            // esta aba mexeu: vale o mais recente
+  };
+  // "delGen": registro que ESTA aba apagou (o banco ainda o tem exatamente como esta aba o viu pela última
+  // vez) não volta; e registro que sumiu do banco (outra pessoa apagou) e que esta aba não mexeu, some daqui.
+  const apagadoAqui=(id,r)=> !!def.delGen && ok && snap[id]!==undefined && fopJsonReg(r)===snap[id];
+  const removidoLa=(id,l)=> !!def.delGen && ok && snap[id]!==undefined && fopJsonReg(l)===snap[id];
+  const esquecer=(id)=>{ const v=FOP_SYNC.snaps[chave]; if(v) delete v[id]; };
+  const trazer=(destPai,chaveNoPai,r,id)=>{
+    const l=destPai[chaveNoPai];
+    if(l===undefined){ if(apagadoAqui(id,r)) return; destPai[chaveNoPai]=r; adotados.push(id); return; }
+    if(!remotoVence(id,l,r)) return;
+    if(l&&typeof l==='object'&&r&&typeof r==='object') fopSubstituirNoLugar(l,r); else destPai[chaveNoPai]=r;
+    adotados.push(id);
+  };
+  // objeto simples (1º nível): { id: registro }
+  const mesclarObjeto=(loc,rem,prefixo,tomb)=>{
+    Object.keys(rem).forEach(a=>{
+      if(tomb && fopLapideVale(tomb[a], rem[a])) return;
+      trazer(loc, a, rem[a], prefixo+a);
+    });
+    if(tomb) Object.keys(loc).forEach(a=>{ if(tomb[a] && fopLapideVale(tomb[a], loc[a])){ delete loc[a]; adotados.push(prefixo+a); } }); // excluído por outra pessoa
+    if(def.delGen) Object.keys(loc).forEach(a=>{ if(!(a in rem) && removidoLa(prefixo+a, loc[a])){ delete loc[a]; esquecer(prefixo+a); adotados.push(prefixo+a); } });
+  };
+  // lista de itens com id
+  const mesclarLista=(loc,rem,tomb,idFn,prefixo,soCresce)=>{
+    if(!Array.isArray(rem)||!Array.isArray(loc)) return;
+    const porId=new Map(); loc.forEach(it=>{ if(it&&typeof it==='object'){ const i=idFn(it); if(i!==null&&i!==undefined) porId.set(String(i),it); } });
+    const noRemoto=new Set();
+    rem.forEach(r=>{
+      if(!r||typeof r!=='object') return; const i0=idFn(r); if(i0===null||i0===undefined) return;
+      const id=String(i0); noRemoto.add(id);
+      if(tomb && fopLapideVale(tomb[id], r)) return;
+      const l=porId.get(id);
+      if(!l){ if(apagadoAqui(prefixo+id,r)) return; loc.push(r); porId.set(id,r); adotados.push(prefixo+id); return; }
+      if(soCresce) return; // histórico: item nunca muda depois de criado
+      if(remotoVence(prefixo+id,l,r)){ fopSubstituirNoLugar(l,r); adotados.push(prefixo+id); }
+    });
+    for(let i=loc.length-1;i>=0;i--){
+      const it=loc[i]; if(!it||typeof it!=='object') continue; const i0=idFn(it); if(i0===null||i0===undefined) continue; const id=String(i0);
+      if(tomb && fopLapideVale(tomb[id], it)){ loc.splice(i,1); adotados.push(prefixo+id); continue; }       // excluída por outra pessoa
+      if(def.delGen && !noRemoto.has(id) && removidoLa(prefixo+id, it)){ loc.splice(i,1); esquecer(prefixo+id); adotados.push(prefixo+id); } // sumiu do banco
+    }
+  };
+  const idPadrao=(it)=>it.id!==undefined?it.id:null;
+  if(def.nivel==='lista'){
+    mesclarLista(local, remoto, lap||{}, idPadrao, '', !!def.append);
+    if(def.ordenar) def.ordenar(local);
+    return adotados;
+  }
+  if(def.nivel==='tempos'){
+    if(!local.ativos||typeof local.ativos!=='object') local.ativos={};
+    if(!Array.isArray(local.registros)) local.registros=[];
+    if(remoto.ativos&&typeof remoto.ativos==='object') mesclarObjeto(local.ativos, remoto.ativos, 'a|', null);
+    if(Array.isArray(remoto.registros)) mesclarLista(local.registros, remoto.registros, null, fopTempoRegId, 'r|', true);
+    return adotados;
+  }
+  if(def.nivel===2){
+    Object.keys(remoto).forEach(a=>{
+      if(lap&&lap[a]) return; // lápide: excluído de propósito, não ressuscita
+      const ro=remoto[a];
+      if(!ro||typeof ro!=='object'||Array.isArray(ro)){ if(!(a in local)) local[a]=ro; return; }
+      if(!local[a]||typeof local[a]!=='object') local[a]={};
+      Object.keys(ro).forEach(b=>{
+        if(lap&&fopLapideVale(lap[a+'|'+b], ro[b])) return;
+        trazer(local[a], b, ro[b], a+'|'+b);
+      });
+    });
+    if(def.delGen) Object.keys(local).forEach(a=>{
+      const lo=local[a]; if(!lo||typeof lo!=='object'||Array.isArray(lo)) return;
+      const ro=(remoto[a]&&typeof remoto[a]==='object')?remoto[a]:{};
+      Object.keys(lo).forEach(b=>{ if(!(b in ro) && removidoLa(a+'|'+b, lo[b])){ delete lo[b]; esquecer(a+'|'+b); adotados.push(a+'|'+b); } });
+    });
+  } else {
+    mesclarObjeto(local, remoto, '', lap);
+  }
+  if(def.cura) fopCurarConfigs(local);
+  return adotados;
+}
+// Cura registros já corrompidos por um bug antigo (misturava a marca de "resetado/pendente" numa
+// configuração já refeita): uma configuração completa (tem configEm) NUNCA deveria carregar a marca de
+// reset/pendente — só o registro de reset puro ({resetado,pendente}, sem configEm) é reset de verdade.
 function fopCurarConfigs(obj){
   let mudou=false;
   Object.keys(obj||{}).forEach(k=>{
@@ -10744,35 +11036,65 @@ function fopCurarConfigs(obj){
   });
   return mudou;
 }
-// Traz do banco (remoto) pro objeto local: empresa que o local não tem; ou empresa em que o remoto é
-// mais novo. Se o local for igual ou mais novo, o local vence (é o que a pessoa acabou de fazer).
-function fopMesclarConfigsRemoto(local, remoto, remotoVenceEmpate){
-  let mudou=false;
-  Object.keys(remoto||{}).forEach(k=>{
-    if(!(k in local)){ local[k]=remoto[k]; mudou=true; return; }
-    const tl=fopCfgTs(local[k]), tr=fopCfgTs(remoto[k]);
-    const remotoMaisNovo = tr>tl || (remotoVenceEmpate && tr===tl && JSON.stringify(local[k])!==JSON.stringify(remoto[k]));
-    if(remotoMaisNovo){ local[k]=remoto[k]; mudou=true; }
-  });
-  if(fopCurarConfigs(local)) mudou=true;
-  return mudou;
+async function fopSyncLerRemoto(chave){
+  const r=await sb.from('configuracoes').select('valor').eq('chave', chave).maybeSingle();
+  if(r && r.error){ // mais de uma linha com a mesma chave (sobra de gravações simultâneas antigas): lê todas e mescla
+    const r2=await sb.from('configuracoes').select('valor').eq('chave', chave);
+    return ((r2&&r2.data)||[]).map(x=>x.valor).filter(Boolean);
+  }
+  return (r&&r.data&&r.data.valor)?[r.data.valor]:[];
 }
-async function fopSalvarConfigsMesclado(chave, valorLocal){
+function fopSalvarChaveTexto(chave, texto){
+  // se não conseguir gravar, a nova tentativa re-lê o banco, mescla de novo e grava (nunca regrava texto velho)
+  return fopGravarConfig(chave, texto, ()=>fopSalvarBlob(chave));
+}
+async function fopSyncRodarSalvamento(chave){
+  const def=FOP_SYNC_DEFS[chave];
+  let remotoTexto=null;
   try {
-    const { data } = await sb.from('configuracoes').select('valor').eq('chave', chave).maybeSingle();
-    if(data && data.valor){
-      const remoto = JSON.parse(data.valor);
-      if(remoto && typeof remoto==='object') fopMesclarConfigsRemoto(valorLocal, remoto, false);
+    // Lápides (exclusões de propósito) de qualquer pessoa entram ANTES de mesclar — assim o que alguém
+    // apagou não volta nem é regravado por esta aba.
+    if(def.lapChave){
+      try{
+        const lt=await fopSyncLerRemoto(def.lapChave); const loc=def.lap();
+        lt.forEach(t=>{ try{ const rem=JSON.parse(t); Object.keys(rem||{}).forEach(k=>{ if(!(k in loc)) loc[k]=rem[k]; }); }catch(e){} });
+      }catch(e){}
     }
+    const textos=await fopSyncLerRemoto(chave);
+    textos.forEach(t=>{ try{ fopSyncMesclar(chave, JSON.parse(t)); }catch(e){} });
+    remotoTexto=textos.length===1?textos[0]:null;
   } catch(e){ /* sem conseguir buscar o remoto, salva só o que tem local, como antes */ }
-  fopCurarConfigs(valorLocal);
-  return fopSalvarChave(chave, valorLocal);
+  if(def.cura) fopCurarConfigs(def.get());
+  const texto=JSON.stringify(def.get());
+  const snapAntes=FOP_SYNC.snaps[chave], okAntes=FOP_SYNC.ok[chave];
+  fopSyncTirarSnap(chave); // mesma "tacada" da serialização: a foto é exatamente o que vai pro banco
+  if(remotoTexto!==null&&remotoTexto===texto){ fopLimparFalha('cfg:'+chave); return; } // nada a gravar (o banco já está igual)
+  const gravou=await fopSalvarChaveTexto(chave, texto);
+  // Não conseguiu gravar: desfaz a "foto" — assim o que esta aba mexeu continua marcado como "ainda não
+  // salvo" e a sincronização não o sobrescreve com o valor antigo do banco.
+  if(!gravou){ FOP_SYNC.snaps[chave]=snapAntes||{}; FOP_SYNC.ok[chave]=okAntes; }
+  return gravou;
+}
+// Um salvamento por vez por chave (gravar = apagar + inserir, não é atômico: duas gravações ao mesmo
+// tempo podiam deixar linhas duplicadas ou perder dados). Pedidos que chegam durante um salvamento
+// viram um único "mais uma rodada" no fim.
+function fopSalvarBlob(chave){
+  fopSyncCarimbar(chave); // síncrono: carimba o que foi mexido AGORA
+  const st=FOP_SYNC.fila[chave]||(FOP_SYNC.fila[chave]={rodando:false,pendente:false,promessa:null});
+  if(st.rodando){ st.pendente=true; return st.promessa; }
+  st.rodando=true;
+  st.promessa=(async()=>{
+    try{ do{ st.pendente=false; await fopSyncRodarSalvamento(chave); } while(st.pendente); }
+    finally{ st.rodando=false; }
+  })();
+  return st.promessa;
 }
 function fopSalvar() {
   // Salvar localmente como fallback imediato
   try { localStorage.setItem('fopApur', JSON.stringify(fopApur)); } catch(e){}
   try { localStorage.setItem('fopApurExcluidos', JSON.stringify(fopApurExcluidos)); } catch(e){}
   try { localStorage.setItem('fopTarefas', JSON.stringify(fopTarefas)); } catch(e){}
+  try { localStorage.setItem('fopTarefasExcluidas', JSON.stringify(fopTarefasExcluidas)); } catch(e){}
   try { localStorage.setItem('fopHistorico', JSON.stringify(fopHistorico)); } catch(e){}
   try { localStorage.setItem('fopPartic', JSON.stringify(fopParticOverride)); } catch(e){}
   try { localStorage.setItem('fopFiscalConfigs', JSON.stringify(fopFiscalConfigs)); } catch(e){}
@@ -10794,13 +11116,14 @@ function fopSalvar() {
   // a versão "mesclada" — ver fopSalvarChaveMesclada — pra não apagar dados de outras pessoas/abas)
   // Passa a lápide (fopApurExcluidos, chaves "mesKey|imposto") pra mesclagem não trazer de volta um
   // registro excluído de propósito em "🗑️ Excluir Este Registro" — ver fopConfirmarExclusaoRegistro.
-  fopSalvarChaveMesclada('fiscal_apur', fopApur, fopApurExcluidos);
+  fopSalvarBlob('fiscal_apur');
   // A lista de excluídos em si é só "soma" (uma exclusão feita em qualquer aba vale pra sempre),
   // então pode usar a mesclagem normal, sem lápide própria — igual a fiscal_itens_extra_lib_excluidos.
   fopSalvarChaveMesclada('fiscal_apur_excluidos', fopApurExcluidos);
-  fopSalvarChave('fiscal_tarefas', fopTarefas);
-  fopSalvarChave('fiscal_historico', fopHistorico);
-  fopSalvarChave('fiscal_partic', fopParticOverride);
+  fopSalvarChaveMesclada('fiscal_tarefas_excluidas', fopTarefasExcluidas); // (a lápide primeiro: assim a mesclagem de tarefas já a conhece)
+  fopSalvarBlob('fiscal_tarefas');
+  fopSalvarBlob('fiscal_historico');
+  fopSalvarBlob('fiscal_partic');
   // Diogo, 02/10/2026: "o Nicolas configurou a empresa e ficou pra Marília configurar também, não
   // atualizou [...] se um configurou, já tem que sumir pro outro também." Causa raiz: isto aqui
   // usava fopSalvarChave (sobrescrita cega). Se a aba de um conferente ficasse aberta com uma cópia
@@ -10808,29 +11131,29 @@ function fopSalvar() {
   // Fiscal — um checklist, por exemplo), a sobrescrita cega apagava de volta a configuração que o
   // outro conferente tinha acabado de salvar. Trocado pra mesclagem segura (como fiscal_apur):
   // nunca perde a configuração de ninguém, não importa a ordem dos salvamentos.
-  fopSalvarConfigsMesclado('fiscal_configs', fopFiscalConfigs);
-  fopSalvarChaveMesclada('fiscal_prazos_internos', fopPrazosInternos);
-  fopSalvarChave('fiscal_colaboradores', fopColaboradores);
-  fopSalvarChave('fiscal_vencimentos_manuais', fopVencimentosManuais);
+  fopSalvarBlob('fiscal_configs');
+  fopSalvarBlob('fiscal_prazos_internos');
+  fopSalvarBlob('fiscal_colaboradores');
+  fopSalvarBlob('fiscal_vencimentos_manuais');
   // Biblioteca de itens extras de checklist (ver fopItensExtraLib) — mesclada porque pode ser
   // criada por qualquer gestor a qualquer momento, em abas diferentes. Passa a "lápide" de excluídos
   // pra mesclagem não trazer de volta um item que foi apagado de propósito (ver fopExcluirItemExtraLib).
-  fopSalvarChaveMesclada('fiscal_itens_extra_lib', fopItensExtraLib, fopItensExtraLibExcluidos);
+  fopSalvarChaveMesclada('fiscal_itens_extra_lib_excluidos', fopItensExtraLibExcluidos); // (a lápide primeiro)
+  fopSalvarBlob('fiscal_itens_extra_lib');
   // A própria lista de excluídos é só "soma" (uma exclusão feita em qualquer aba deve valer pra
   // sempre) — por isso pode usar a mesclagem normal, sem lápide própria.
-  fopSalvarChaveMesclada('fiscal_itens_extra_lib_excluidos', fopItensExtraLibExcluidos);
   // Obrigações Acessórias usam o mesmo "mesKey" (fopGetKey) e os mesmos nomes de imposto nunca se
   // repetem entre os dois grupos — por isso reaproveita a mesma lápide fopApurExcluidos.
-  fopSalvarChaveMesclada('fiscal_apur_acess', fopApurAcess, fopApurExcluidos);
-  fopSalvarChave('fiscal_tempos', fopTempos);
+  fopSalvarBlob('fiscal_apur_acess');
+  fopSalvarBlob('fiscal_tempos');
   // Mesmo risco de sobrescrita cega do fiscal_configs acima (ver comentário) existe aqui no
   // Contábil — mesma estrutura (configMap por CNPJ em contBuildClientes()) — por isso a mesma correção.
-  fopSalvarConfigsMesclado('contabil_configs', contConfigs);
-  fopSalvarChave('contabil_colaboradores', contColaboradores);
-  fopSalvarChave('contabil_checklists', contChkLista);
-  fopSalvarChaveMesclada('contabil_apur', contApur);
-  fopSalvarChaveMesclada('contabil_apur_acess', contApurAcess);
-  fopSalvarChave('contabil_tempos', contTempos);
+  fopSalvarBlob('contabil_configs');
+  fopSalvarBlob('contabil_colaboradores');
+  fopSalvarBlob('contabil_checklists');
+  fopSalvarBlob('contabil_apur');
+  fopSalvarBlob('contabil_apur_acess');
+  fopSalvarBlob('contabil_tempos');
   // Snapshot enxuto (cnpj, nome, responsável, tributação, inscrição estadual) de toda empresa
   // ativa — usado só pelo robô de e-mail diário (netlify/functions/daily-email.js), que roda no
   // servidor e não tem acesso ao array FISCAL_CLIENTES_BASE (que só existe aqui no navegador).
@@ -10847,7 +11170,7 @@ function fopSalvar() {
 }
 async function fopCarregarSupa(){
   try {
-    const chaves = ['fiscal_apur','fiscal_apur_excluidos','fiscal_tarefas','fiscal_historico','fiscal_partic','fiscal_configs','fiscal_prazos_internos','fiscal_colaboradores','fiscal_vencimentos_manuais','fiscal_apur_acess','fiscal_tempos','fiscal_itens_extra_lib','fiscal_itens_extra_lib_excluidos','contabil_configs','contabil_colaboradores','contabil_checklists','contabil_apur','contabil_apur_acess','contabil_tempos'];
+    const chaves = ['fiscal_apur','fiscal_apur_excluidos','fiscal_tarefas','fiscal_tarefas_excluidas','fiscal_historico','fiscal_partic','fiscal_configs','fiscal_prazos_internos','fiscal_colaboradores','fiscal_vencimentos_manuais','fiscal_apur_acess','fiscal_tempos','fiscal_itens_extra_lib','fiscal_itens_extra_lib_excluidos','contabil_configs','contabil_colaboradores','contabil_checklists','contabil_apur','contabil_apur_acess','contabil_tempos'];
     const { data } = await sb.from('configuracoes').select('chave,valor').in('chave', chaves);
     if(data && data.length){
       data.forEach(row=>{
@@ -10856,6 +11179,7 @@ async function fopCarregarSupa(){
           if(row.chave==='fiscal_apur') fopApur=val;
           else if(row.chave==='fiscal_apur_excluidos') fopApurExcluidos=val;
           else if(row.chave==='fiscal_tarefas') fopTarefas=val;
+          else if(row.chave==='fiscal_tarefas_excluidas') fopTarefasExcluidas=val;
           else if(row.chave==='fiscal_historico') fopHistorico=val;
           else if(row.chave==='fiscal_partic') fopParticOverride=val;
           else if(row.chave==='fiscal_configs') fopFiscalConfigs=val;
@@ -10879,14 +11203,22 @@ async function fopCarregarSupa(){
       // aqui também, na hora de carregar — não só na hora de salvar.
       Object.keys(fopItensExtraLibExcluidos).forEach(id=>{ if(fopItensExtraLib[id]) delete fopItensExtraLib[id]; });
       fopCurarConfigs(fopFiscalConfigs); fopCurarConfigs(contConfigs); // ver fopCurarConfigs
+      // Linhas duplicadas da mesma chave (sobra de gravações simultâneas antigas): o forEach acima ficou
+      // com a ÚLTIMA — aqui mescla as outras nela (vale o registro mais recente), pra não perder nada.
+      Object.keys(FOP_SYNC_DEFS).forEach(chave=>{
+        const linhas=data.filter(r=>r.chave===chave&&r.valor);
+        if(linhas.length>1) linhas.slice(0,-1).forEach(r=>{ try{ fopSyncMesclar(chave, JSON.parse(r.valor)); }catch(e){} });
+      });
+      // "Foto" do que foi carregado: a partir daqui dá pra saber o que esta aba mexeu (ver FOP_SYNC_DEFS)
+      Object.keys(FOP_SYNC_DEFS).forEach(chave=>fopSyncTirarSnap(chave));
       // Mesma limpeza defensiva pra registros de apuração excluídos via "🗑️ Excluir Este Registro"
       // (chave composta "mesKey|imposto") — remove qualquer fantasma que tenha sobrado salvo, tanto
       // nas obrigações do mês (fopApur) quanto nas Acessórias (fopApurAcess, mesma lápide).
       Object.keys(fopApurExcluidos).forEach(chaveComposta=>{
         const i=chaveComposta.lastIndexOf('|'); if(i<0) return;
         const mesKey=chaveComposta.slice(0,i), impKey=chaveComposta.slice(i+1);
-        if(fopApur[mesKey] && fopApur[mesKey][impKey]) delete fopApur[mesKey][impKey];
-        if(fopApurAcess[mesKey] && fopApurAcess[mesKey][impKey]) delete fopApurAcess[mesKey][impKey];
+        if(fopApur[mesKey] && fopApur[mesKey][impKey] && fopLapideVale(fopApurExcluidos[chaveComposta], fopApur[mesKey][impKey])) delete fopApur[mesKey][impKey];
+        if(fopApurAcess[mesKey] && fopApurAcess[mesKey][impKey] && fopLapideVale(fopApurExcluidos[chaveComposta], fopApurAcess[mesKey][impKey])) delete fopApurAcess[mesKey][impKey];
       });
       return true; // carregou do Supabase
     }
@@ -10895,46 +11227,83 @@ async function fopCarregarSupa(){
 }
 
 // Diogo, 02/10/2026: "tem que sempre atualizar após a configuração da empresa" — quem já está com
-// o Portal aberto (ex.: a Marília, numa aba que já estava logada antes do Nicolas configurar uma
-// empresa) só pegava a configuração nova do colega se recarregasse a página inteira. Esta função
-// busca só 'fiscal_configs'/'contabil_configs' no banco de tempos em tempos e atualiza na tela,
-// sem precisar de F5. Só troca localmente o que realmente mudou (evita re-render à toa) e nunca
-// sobrescreve o banco — é só leitura, bem mais leve que o fopCarregarSupa() completo do login.
+// o Portal aberto só pegava o que o colega salvou se recarregasse a página inteira. Diogo, 06/10/2026:
+// "empresa finaliza e depois volta pra conferência / o checklist some" — mesmo problema (aba velha), agora
+// pras apurações também. Esta função busca no banco, de tempos em tempos (e quando você volta pra aba),
+// as apurações, acessórias e configurações, e traz pra tela o que o colega mudou — registro a registro,
+// sem nunca sobrescrever o banco (ver FOP_SYNC_DEFS). O nome ficou o mesmo por compatibilidade.
 async function fopSincronizarConfigsRemoto(){
   try{
-    const { data } = await sb.from('configuracoes').select('chave,valor').in('chave', ['fiscal_configs','contabil_configs']);
+    await fopReenviarFalhas(); // 1º tenta gravar de novo o que não tinha conseguido salvar
+    const chaves=Object.keys(FOP_SYNC_DEFS);
+    const { data } = await sb.from('configuracoes').select('chave,valor').in('chave', [...chaves,'fiscal_tarefas_excluidas','fiscal_apur_excluidos','fiscal_itens_extra_lib_excluidos']);
     if(!data || !data.length) return;
-    let mudouFiscal=false, mudouContabil=false;
-    data.forEach(row=>{
-      if(!row.valor) return;
-      let remoto; try{ remoto=JSON.parse(row.valor); }catch(e){ return; }
-      if(!remoto || typeof remoto!=='object') return;
-      if(row.chave==='fiscal_configs'){
-        if(fopMesclarConfigsRemoto(fopFiscalConfigs, remoto, true)) mudouFiscal=true;
-      } else if(row.chave==='contabil_configs'){
-        if(fopMesclarConfigsRemoto(contConfigs, remoto, true)) mudouContabil=true;
+    const mudou={};
+    // Lápides (exclusões feitas de propósito por qualquer pessoa) — só crescem; traz as novas pra cá
+    // ANTES de mesclar, pra tarefa/registro que outra pessoa apagou não voltar nem ficar parado aqui.
+    [['fiscal_tarefas_excluidas',()=>fopTarefasExcluidas],['fiscal_apur_excluidos',()=>fopApurExcluidos],['fiscal_itens_extra_lib_excluidos',()=>fopItensExtraLibExcluidos]].forEach(([chave,get])=>{
+      const linha=data.find(r=>r.chave===chave&&r.valor); if(!linha) return;
+      try{ const rem=JSON.parse(linha.valor); const loc=get(); Object.keys(rem||{}).forEach(k=>{ if(!(k in loc)) loc[k]=rem[k]; }); }catch(e){}
+    });
+    Object.keys(fopApurExcluidos||{}).forEach(chaveComposta=>{
+      const i=chaveComposta.lastIndexOf('|'); if(i<0) return;
+      const mesKey=chaveComposta.slice(0,i), impKey=chaveComposta.slice(i+1);
+      if(fopApur[mesKey]&&fopApur[mesKey][impKey]&&fopLapideVale(fopApurExcluidos[chaveComposta], fopApur[mesKey][impKey])) delete fopApur[mesKey][impKey];
+      if(fopApurAcess[mesKey]&&fopApurAcess[mesKey][impKey]&&fopLapideVale(fopApurExcluidos[chaveComposta], fopApurAcess[mesKey][impKey])) delete fopApurAcess[mesKey][impKey];
+    });
+    chaves.forEach(chave=>{
+      const st=FOP_SYNC.fila[chave];
+      if(st&&st.rodando) return; // está salvando agora — fica pro próximo ciclo
+      const linhas=data.filter(r=>r.chave===chave&&r.valor);
+      if(!linhas.length) return;
+      const def=FOP_SYNC_DEFS[chave];
+      fopSyncCarimbar(chave); // o que esta aba mexeu e ainda não foi salvo é protegido
+      const adotados=[];
+      linhas.forEach(r=>{ try{ fopSyncMesclar(chave, JSON.parse(r.valor)).forEach(id=>adotados.push(id)); }catch(e){} });
+      if(def.cura && fopCurarConfigs(def.get())) adotados.push('*');
+      if(adotados.length){
+        mudou[chave]=true;
+        // atualiza a "foto" só dos registros que passaram a valer o do banco (os mexidos aqui continuam "mexidos")
+        const snap=FOP_SYNC.snaps[chave]||(FOP_SYNC.snaps[chave]={});
+        fopSyncPercorrer(def.get(), def.nivel, (id,r)=>{ if(adotados.includes(id)) snap[id]=fopJsonReg(r); });
+        try{ localStorage.setItem(def.ls, JSON.stringify(def.get())); }catch(e){}
       }
     });
+    const mudouFiscal=['fiscal_apur','fiscal_apur_acess','fiscal_configs','fiscal_tarefas','fiscal_partic','fiscal_prazos_internos','fiscal_vencimentos_manuais','fiscal_itens_extra_lib','fiscal_colaboradores'].some(c=>mudou[c]);
+    const mudouContabil=['contabil_apur','contabil_apur_acess','contabil_configs','contabil_colaboradores','contabil_checklists'].some(c=>mudou[c]);
     if(mudouFiscal){
-      try{ localStorage.setItem('fopFiscalConfigs', JSON.stringify(fopFiscalConfigs)); }catch(e){}
-      if(document.getElementById('page-fiscal')?.classList.contains('active')){
-        if(typeof renderFiscalTable==='function') renderFiscalTable();
-        if(typeof fopRenderConfigFiscal==='function') fopRenderConfigFiscal();
-      }
+      const pg=document.getElementById('page-fiscal');
+      if(pg&&pg.classList.contains('active')) renderPreservandoScroll(pg, fopRenderFiscalAtivo);
     }
     if(mudouContabil){
-      try{ localStorage.setItem('contConfigs', JSON.stringify(contConfigs)); }catch(e){}
-      if(document.getElementById('page-contabil')?.classList.contains('active')){
+      const pg=document.getElementById('page-contabil');
+      if(pg&&pg.classList.contains('active')) renderPreservandoScroll(pg, ()=>{
         if(typeof contRenderTable==='function') contRenderTable();
         if(typeof contRenderConfigList==='function') contRenderConfigList();
-      }
+      });
     }
   }catch(e){ /* sincronização em segundo plano — falha aqui não deve incomodar o usuário */ }
 }
+// Redesenha a sub-aba do Fiscal que está aberta (sem trocar de aba nem mexer em nada do usuário)
+function fopRenderFiscalAtivo(){
+  const sub=document.querySelector('#page-fiscal .fsub.active');
+  const tab=sub?sub.id.replace('fsub-',''):'apuracoes';
+  if(typeof renderFiscalTable==='function') renderFiscalTable(); // sempre: cards, contadores e selos do topo
+  if(tab==='acessorias'&&typeof renderFiscalTableAcess==='function') renderFiscalTableAcess();
+  else if(tab==='configfiscal'&&typeof fopRenderConfigFiscal==='function') fopRenderConfigFiscal();
+  else if(tab==='tarefas'&&typeof fopRenderTarefas==='function') fopRenderTarefas();
+  else if(tab==='conferencia'&&typeof fopRenderConferencia==='function') fopRenderConferencia();
+  else if(tab==='finalizados'&&typeof fopRenderFinalizados==='function') fopRenderFinalizados();
+}
+// Voltou pra esta aba do navegador depois de um tempo: é aí que ela está mais desatualizada
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible' && typeof usuarioLogado!=='undefined' && usuarioLogado) fopSincronizarConfigsRemoto();
+});
 function fopCarregar() {
   try { const d=localStorage.getItem('fopApur'); if(d) fopApur=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopApurExcluidos'); if(d) fopApurExcluidos=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopTarefas'); if(d) fopTarefas=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('fopTarefasExcluidas'); if(d) fopTarefasExcluidas=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopHistorico'); if(d) fopHistorico=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopPartic'); if(d) fopParticOverride=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('fopFiscalConfigs'); if(d) fopFiscalConfigs=JSON.parse(d); } catch(e){}
@@ -10949,8 +11318,8 @@ function fopCarregar() {
   Object.keys(fopApurExcluidos).forEach(chaveComposta=>{
     const i=chaveComposta.lastIndexOf('|'); if(i<0) return;
     const mesKey=chaveComposta.slice(0,i), impKey=chaveComposta.slice(i+1);
-    if(fopApur[mesKey] && fopApur[mesKey][impKey]) delete fopApur[mesKey][impKey];
-    if(fopApurAcess[mesKey] && fopApurAcess[mesKey][impKey]) delete fopApurAcess[mesKey][impKey];
+    if(fopApur[mesKey] && fopApur[mesKey][impKey] && fopLapideVale(fopApurExcluidos[chaveComposta], fopApur[mesKey][impKey])) delete fopApur[mesKey][impKey];
+    if(fopApurAcess[mesKey] && fopApurAcess[mesKey][impKey] && fopLapideVale(fopApurExcluidos[chaveComposta], fopApurAcess[mesKey][impKey])) delete fopApurAcess[mesKey][impKey];
   });
   try { const d=localStorage.getItem('fopTempos'); if(d) fopTempos=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('contConfigs'); if(d) contConfigs=JSON.parse(d); } catch(e){}
@@ -15107,6 +15476,7 @@ function fopExcluirTarefaAvulsa(id){
   if(!t||t.tipo!=='manual') return;
   if(!confirm('Excluir a tarefa "'+(t.motivo||'')+'"? Isso não pode ser desfeito.')) return;
   fopTarefas=fopTarefas.filter(x=>x.id!==id);
+  fopTarefasExcluidas[String(id)]=new Date().toISOString(); // lápide: a mesclagem não traz de volta do banco
   fopSalvar();
   fopRenderTarefas();
   mostrarToast('🗑️ Tarefa excluída');
