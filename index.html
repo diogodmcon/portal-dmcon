@@ -4553,7 +4553,7 @@ function pararRealtime(){
 // ── SYNC AUTOMÁTICO A CADA 8s ──────────────────────
 let _pollingInterval = null;
 const _renderPorPagina = {
-  'page-comercial':   ()=>{ renderKanban(); },
+  'page-comercial':   ()=>{ if(typeof dragLeadId!=='undefined'&&dragLeadId) return; /* arrastando um card: não mexe na tela */ if(comKanbanSemMudanca()) return; renderKanban(); },
   'page-societario':  ()=>{ renderSocGrid(); atualizarKpisSoc(); },
   'page-onboarding':  ()=>{ renderOnbGrid(); atualizarKpisOnb(); },
   'page-comissoes':   ()=>{ renderComissoes(); },
@@ -4564,6 +4564,36 @@ const _renderPorPagina = {
   'page-fiscal':      ()=>{ renderFiscalTable(); },
   'page-mensagens':   ()=>{ renderMensagens(); },
 };
+// Diogo, 06/10/2026: "no Kanban do Comercial, quando estamos rolando pra baixo e paramos, ele volta tudo
+// pra cima." Causa raiz: a sincronização automática (a cada 8s, e ao voltar pra aba) redesenha a
+// página inteira com innerHTML — e quem redesenha zera a posição de rolagem de tudo que foi recriado
+// (cada coluna do Kanban tem a sua própria barra de rolagem). Estas duas funções guardam a posição de
+// rolagem de tudo que rola dentro da página (e dos "pais" dela) ANTES de redesenhar e devolvem DEPOIS,
+// achando cada elemento pelo caminho (posição entre os irmãos) — como o desenho novo tem a mesma
+// estrutura, cada coluna volta exatamente pro ponto onde estava.
+function scrollCapturar(raiz){
+  const salvos=[];
+  if(!raiz) return ()=>{};
+  const caminhoDe=(el)=>{ const c=[]; let n=el; while(n&&n!==raiz){ const p=n.parentElement; if(!p) return null; c.unshift(Array.prototype.indexOf.call(p.children,n)); n=p; } return n===raiz?c:null; };
+  [raiz,...raiz.querySelectorAll('*')].forEach(el=>{
+    if(el.scrollTop||el.scrollLeft){ const c=caminhoDe(el); if(c) salvos.push({c,top:el.scrollTop,left:el.scrollLeft}); }
+  });
+  // "pais" da página que também rolam (ex.: o painel principal) — são os mesmos elementos antes e depois
+  const pais=[]; for(let n=raiz.parentElement;n;n=n.parentElement){ if(n.scrollTop||n.scrollLeft) pais.push({el:n,top:n.scrollTop,left:n.scrollLeft}); }
+  const doc=document.scrollingElement; const docTop=doc?doc.scrollTop:0, docLeft=doc?doc.scrollLeft:0;
+  return ()=>{
+    salvos.forEach(({c,top,left})=>{
+      let n=raiz; for(const i of c){ n=n&&n.children[i]; if(!n) return; }
+      if(n){ n.scrollTop=top; n.scrollLeft=left; }
+    });
+    pais.forEach(({el,top,left})=>{ el.scrollTop=top; el.scrollLeft=left; });
+    if(doc){ doc.scrollTop=docTop; doc.scrollLeft=docLeft; }
+  };
+}
+function renderPreservandoScroll(raiz, fn){
+  const restaurar=scrollCapturar(raiz);
+  try{ fn(); } finally { restaurar(); }
+}
 function iniciarPollingSync(){
   if(_pollingInterval) clearInterval(_pollingInterval);
   _pollingInterval = setInterval(async () => {
@@ -4582,7 +4612,7 @@ function iniciarPollingSync(){
       // Renderizar a página que está aberta agora
       const pagAtiva = document.querySelector('.page.active')?.id;
       const fn = _renderPorPagina[pagAtiva];
-      if(fn) fn();
+      if(fn) renderPreservandoScroll(document.getElementById(pagAtiva), fn);
     } catch(e){ console.warn('Polling erro:', e.message); }
   }, 8000);
 }
@@ -4596,7 +4626,7 @@ document.addEventListener('visibilitychange', async () => {
       ]);
       const pagAtiva = document.querySelector('.page.active')?.id;
       const fn = _renderPorPagina[pagAtiva];
-      if(fn) fn();
+      if(fn) renderPreservandoScroll(document.getElementById(pagAtiva), fn);
     } catch(e){}
   }
 });
@@ -5766,18 +5796,53 @@ function abrirAbaLead(aba){
   }
 }
 
-function excluirLeadModal(){
-  const id = document.getElementById('edit-lead-id').value;
-  const lead = leads.find(l=>l.id===id);
-  if(!lead) return;
-  if(!confirm('Excluir "' + lead.nome + '" permanentemente?')) return;
+// Confirmação por palavra-chave (Diogo, 06/10/2026: "se for excluir algum tem que pedir comprovação
+// colocando uma palavra-chave") — mesmo padrão já usado em Fiscal > Excluir Registro: o botão de
+// excluir só habilita depois de digitar EXCLUIR. Reutilizável: passe o título, o texto e a função
+// que faz a exclusão de verdade (só roda depois da palavra certa).
+const PALAVRA_EXCLUSAO='EXCLUIR';
+let _exclusaoChaveAcao=null;
+function pedirPalavraChaveExclusao(titulo, descricaoHtml, aoConfirmar){
+  _exclusaoChaveAcao=aoConfirmar;
+  let m=document.getElementById('modal-exclusao-chave');
+  if(!m){ m=document.createElement('div'); m.id='modal-exclusao-chave'; m.className='modal-overlay'; document.body.appendChild(m); }
+  m.innerHTML=`<div class="modal" style="max-width:460px;width:90%;">
+    <div class="modal-header">
+      <div style="font-size:15px;font-weight:700;color:var(--red);">🗑️ ${titulo}</div>
+      <button class="modal-close" onclick="fecharExclusaoChave()">✕</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <div style="font-size:12.5px;color:var(--text-primary);margin-bottom:12px;line-height:1.5;">${descricaoHtml} <span style="color:var(--red);font-weight:700;">Isso não pode ser desfeito.</span></div>
+      <label style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Pra confirmar, digite <span style="color:var(--red);">${PALAVRA_EXCLUSAO}</span> abaixo</label>
+      <input id="exclusao-chave-input" type="text" autocomplete="off" oninput="document.getElementById('exclusao-chave-btn').disabled=(this.value.trim().toUpperCase()!=='${PALAVRA_EXCLUSAO}')" onkeydown="if(event.key==='Enter'){confirmarExclusaoChave();}" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text-primary);margin:8px 0 14px;font-size:13px;" placeholder="${PALAVRA_EXCLUSAO}">
+      <button id="exclusao-chave-btn" disabled onclick="confirmarExclusaoChave()" style="width:100%;padding:10px;border-radius:8px;background:rgba(255,77,106,.15);border:1px solid rgba(255,77,106,.4);color:var(--red);font-weight:700;cursor:pointer;">Excluir Definitivamente</button>
+    </div>
+  </div>`;
+  m.classList.add('open');
+  setTimeout(()=>document.getElementById('exclusao-chave-input')?.focus(),50);
+}
+function fecharExclusaoChave(){ document.getElementById('modal-exclusao-chave')?.classList.remove('open'); _exclusaoChaveAcao=null; }
+function confirmarExclusaoChave(){
+  const valor=(document.getElementById('exclusao-chave-input')?.value||'').trim().toUpperCase();
+  if(valor!==PALAVRA_EXCLUSAO||!_exclusaoChaveAcao) return; // o botão já vem desabilitado, mas confere de novo por segurança
+  const acao=_exclusaoChaveAcao;
+  fecharExclusaoChave();
+  acao();
+}
+function _excluirLeadDeVerdade(id){
   leads = leads.filter(l=>l.id!==id);
-  document.getElementById('modal-editar-lead').classList.remove('open');
+  document.getElementById('modal-editar-lead')?.classList.remove('open');
   renderKanban();
   sb.from('leads').delete().eq('id', id).then(({error})=>{
     if(error) mostrarToast('⚠️ Erro ao excluir: ' + error.message);
     else mostrarToast('🗑 Lead excluído');
   });
+}
+function excluirLeadModal(){
+  const id = document.getElementById('edit-lead-id').value;
+  const lead = leads.find(l=>l.id===id);
+  if(!lead) return;
+  pedirPalavraChaveExclusao('Excluir Lead', 'Isso vai apagar <strong>'+lead.nome+'</strong> permanentemente do funil.', ()=>_excluirLeadDeVerdade(id));
 }
 
 
@@ -5891,7 +5956,22 @@ async function carregarMetasSupa(){
 // ── DRAG AND DROP state ──
 let dragLeadId = null;
 
+// Assinatura do que o Kanban mostra agora (leads já filtrados). A sincronização automática só
+// redesenha o Kanban se isso mudou de verdade — redesenhar sem necessidade também fazia o card sob o
+// mouse "piscar" e fechava selects abertos.
+let _comKanbanSig = null;
+function comKanbanAssinatura(){ try{ return JSON.stringify(comListaFiltrada()); }catch(e){ return null; } }
+function comKanbanSemMudanca(){
+  const board=document.getElementById('kanban-board');
+  if(!board||!board.children.length||_comKanbanSig===null) return false;
+  return comKanbanAssinatura()===_comKanbanSig;
+}
 function renderKanban(){
+  const raiz=document.getElementById('page-comercial');
+  if(raiz) return renderPreservandoScroll(raiz, renderKanbanSemScroll);
+  return renderKanbanSemScroll();
+}
+function renderKanbanSemScroll(){
   const board = document.getElementById('kanban-board');
   if(!board) return;
 
@@ -5989,6 +6069,7 @@ function renderKanban(){
   }).join('');
   renderListaCom();
   atualizarKpisKanban();
+  _comKanbanSig = comKanbanAssinatura();
 }
 
 // Alterna entre visualização em Kanban (colunas) e em Lista (tabela agrupada por etapa).
@@ -6129,13 +6210,9 @@ function moverLead(id, direcao){
 }
 
 function excluirLead(id){
-  if(!confirm('Excluir este lead permanentemente?')) return;
-  leads = leads.filter(l=>l.id!==id);
-  renderKanban();
-  sb.from('leads').delete().eq('id', id).then(({error})=>{
-    if(error) mostrarToast('⚠️ Erro ao excluir: ' + error.message);
-    else mostrarToast('🗑 Lead excluído');
-  });
+  const lead = leads.find(l=>l.id===id);
+  if(!lead) return;
+  pedirPalavraChaveExclusao('Excluir Lead', 'Isso vai apagar <strong>'+lead.nome+'</strong> permanentemente do funil.', ()=>_excluirLeadDeVerdade(id));
 }
 
 // Corrige o vendedor responsável direto pelo card do Kanban, sem precisar abrir o modal —
