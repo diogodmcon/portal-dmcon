@@ -6277,6 +6277,31 @@ function sugerirProcessoSocietario(lead){
   m.classList.add('open');
 }
 
+// Diogo, 14/10/2026: "tudo que eu colocar no comercial tem que levar as informações para o societário" —
+// ao fechar o lead, só nome e CNPJ iam pro processo; honorário, serviços, observações, regime etc. ficavam
+// só no Comercial e a pessoa tinha que digitar tudo de novo. Estas funções levam o resto.
+function _htmlSeguro(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function comLeadDoProcesso(proc){
+  if(!proc||!proc.leadOrigemId||typeof leads==='undefined') return null;
+  return leads.find(l=>String(l.id)===String(proc.leadOrigemId))||null;
+}
+function comHonorarioTexto(lead){
+  const v=Number(lead&&lead.valor_estimado)||0;
+  return v>0 ? 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
+}
+// Texto que vai de presente pro chat do processo (a pessoa ainda pode editar antes de criar)
+function comResumoParaSocietario(lead){
+  const linhas=['📋 Dados vindos do Comercial:'];
+  const hon=comHonorarioTexto(lead);
+  if(hon) linhas.push('• Honorário combinado: '+hon);
+  if(lead.servicos&&lead.servicos.length) linhas.push('• Serviços: '+lead.servicos.join(', '));
+  if(lead.regime&&lead.regime!=='A definir') linhas.push('• Regime: '+lead.regime);
+  if(lead.segmento) linhas.push('• Segmento: '+lead.segmento);
+  if(lead.origem) linhas.push('• Origem do lead: '+lead.origem);
+  if(lead.responsavel) linhas.push('• Vendedor: '+lead.responsavel);
+  if(lead.observacoes&&String(lead.observacoes).trim()) linhas.push('• Observações do Comercial: '+String(lead.observacoes).trim());
+  return linhas.join('\n');
+}
 function criarProcessoDoLead(leadId){
   const lead = leads.find(l=>l.id===leadId);
   if(!lead) return;
@@ -6297,6 +6322,11 @@ function criarProcessoDoLead(leadId){
       if(nomeEl) nomeEl.value = lead.nome;
       if(cnpjEl) cnpjEl.value = lead.cnpj||'';
       if(leadOrigemEl) leadOrigemEl.value = lead.id||'';
+      // Regime e mensagem inicial já vêm do Comercial (nada de digitar de novo)
+      const regEl = document.getElementById('proc-regime');
+      if(regEl){ const op=[...regEl.options].find(o=>o.value===lead.regime||o.text===lead.regime); regEl.value = op ? op.value : 'A definir'; }
+      const msgEl = document.getElementById('proc-msg-resp');
+      if(msgEl) msgEl.value = comResumoParaSocietario(lead);
       // Selecionar tipo
       document.querySelectorAll('#modal-novo-processo .svc-chip').forEach(c=>{
         c.classList.toggle('sel', c.getAttribute('onclick')?.includes(`'${tipo}'`));
@@ -7327,6 +7357,22 @@ function abrirChecklist(procId, aba){
           <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Abertura</div>
           <div style="font-size:13px;color:var(--text-primary);">${proc.abertura||'—'}</div>
         </div>
+        ${(()=>{
+          const L=comLeadDoProcesso(proc);
+          if(!proc.leadOrigemId) return '';
+          if(!L) return `<div style="background:var(--bg-input);border-radius:10px;padding:14px;grid-column:1/-1;font-size:12px;color:var(--text-muted);">🤝 Dados do Comercial: o lead de origem não está mais no funil. A mensagem inicial do chat guarda o resumo que foi enviado.</div>`;
+          const cel=(rot,val,full)=>val?`<div style="${full?'grid-column:1/-1;':''}"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;">${rot}</div><div style="font-size:13px;color:var(--text-primary);white-space:pre-wrap;">${_htmlSeguro(val)}</div></div>`:'';
+          return `<div id="soc-dados-comercial" style="background:var(--cyan-glow);border:1px solid rgba(0,170,221,.25);border-radius:10px;padding:14px;grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="grid-column:1/-1;font-size:10px;color:var(--cyan);text-transform:uppercase;letter-spacing:.6px;">🤝 Dados do Comercial (sempre atualizados)</div>
+            ${cel('Honorário combinado', comHonorarioTexto(L)||'Não informado')}
+            ${cel('Serviços', (L.servicos||[]).join(', '))}
+            ${cel('Segmento', L.segmento)}
+            ${cel('Origem do lead', L.origem)}
+            ${cel('Vendedor', L.responsavel)}
+            ${cel('Fechado em', L.mes_conclusao)}
+            ${cel('Observações do Comercial', L.observacoes, true)}
+          </div>`;
+        })()}
         ${proc.temComissao?`
         <div style="background:rgba(255,140,66,.1);border:1px solid rgba(255,140,66,.3);border-radius:10px;padding:14px;grid-column:1/-1;">
           <div style="font-size:10px;color:var(--orange);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">💰 Comissão</div>
